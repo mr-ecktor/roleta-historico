@@ -1,2 +1,3 @@
 roleta.db
 __pycache__/
+.streamlit/secrets.toml
