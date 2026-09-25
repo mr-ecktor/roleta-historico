@@ -90,7 +90,7 @@ def pagina_simulador(por_mesa, limites):
     limite = limites.get(mesa)
     tres_opcoes = len(PADROES[padrao]) == 3
     d1, d2, d3, d4, d5, d6 = st.columns(6)
-    gatilho = d1.number_input("Gatilho (sem sair)", help="Entra quando a categoria completar esse número de rodadas seguidas sem sair", min_value=0, max_value=50, value=5, step=1, key="sim_gatilho")
+    gatilho = d1.number_input("Gatilho", help="Entra quando a categoria completar esse número de rodadas seguidas sem sair", min_value=0, max_value=50, value=5, step=1, key="sim_gatilho")
     ficha = d2.number_input("Ficha inicial (R$)", min_value=0.10, max_value=10000.0,
                             value=float(limite["min"]) if limite else 0.50, step=0.50, format="%.2f", key=f"sim_ficha_{mesa}")
     tipo = d3.selectbox("Recuperação", ["Minha tabela", "Multiplicador"], key="sim_tipo")

@@ -84,7 +84,7 @@ div[data-baseweb="select"] > div:hover { border-color: var(--laranja) !important
 
 /* Cabeçalho */
 .cabecalho { display: flex; align-items: center; gap: 1rem; }
-.cabecalho img { height: 64px; filter: drop-shadow(0 0 18px rgba(255, 106, 0, .45)); }
+.cabecalho img { height: 92px; filter: drop-shadow(0 0 18px rgba(255, 106, 0, .45)); }
 .marca {
     font-family: 'Sora', sans-serif; font-size: .78rem; font-weight: 700; letter-spacing: .32em;
     text-transform: uppercase; background: var(--degrade); -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -95,6 +95,12 @@ div[data-baseweb="select"] > div:hover { border-color: var(--laranja) !important
 }
 .subtitulo { color: var(--texto-2); margin: .8rem 0 1.4rem; font-size: .95rem; }
 
+/* Botões Análise | Simulador centralizados na página; Sair encostado à direita */
+.st-key-modo, .st-key-sair { width: 100% !important; }
+.st-key-modo [data-testid="stButtonGroup"] { width: 100%; display: flex; justify-content: center; }
+.st-key-modo button { font-family: 'Sora', sans-serif; font-weight: 600; padding: .45rem 1.4rem; }
+.st-key-sair .stButton { width: 100%; display: flex; justify-content: flex-end; }
+.st-key-sair button { width: auto !important; padding: .45rem 1.6rem; }
 /* Resumo */
 .resumo {
     display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; align-items: center;
@@ -200,16 +206,18 @@ def dados():
 
 por_mesa, limites = dados()
 
-topo, sair = st.columns([6, 1], vertical_alignment="center")
+topo, centro, sair = st.columns([1, 1, 1], vertical_alignment="center")
+with centro:
+    modo = st.segmented_control("Modo", ["Análise", "Simulador"], default="Análise", key="modo",
+                                label_visibility="collapsed") or "Análise"
 topo.markdown(
     f'<div class="cabecalho"><img src="data:image/png;base64,{SIMBOLO}" alt="">'
     '<div><div class="marca">Guardian</div><p class="titulo">Análise de Roletas</p></div></div>',
     unsafe_allow_html=True,
 )
-if sair.button("Sair", use_container_width=True):
+if sair.button("Sair", key="sair"):
     st.session_state.logado = False
     st.rerun()
-modo = st.segmented_control("Modo", ["Análise", "Simulador"], default="Análise", label_visibility="collapsed") or "Análise"
 SUBTITULOS = {
     "Análise": "Quantas vezes cada padrão ficou X rodadas seguidas sem sair.",
     "Simulador": "Teste uma estratégia com recuperação nos giros reais coletados — sem apostar dinheiro.",
