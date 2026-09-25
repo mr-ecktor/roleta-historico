@@ -1,0 +1,17 @@
+{
+  "Auto Mega Roulette (Pragmatic)": {
+    "max": 25000.0,
+    "min": 0.5,
+    "moeda": "BRL"
+  },
+  "Auto Roulette (Pragmatic)": {
+    "max": 25000.0,
+    "min": 2.5,
+    "moeda": "BRL"
+  },
+  "Speed Auto Roulette (Pragmatic)": {
+    "max": 25000.0,
+    "min": 2.5,
+    "moeda": "BRL"
+  }
+}

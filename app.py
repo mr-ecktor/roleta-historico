@@ -11,7 +11,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from analise import FUSO_BRASILIA, PADROES, PERIODOS, analisar, carregar_giros, filtrar_periodo
+from analise import (FUSO_BRASILIA, PADROES, PERIODOS, analisar, carregar_giros, carregar_limites,
+                     filtrar_periodo, formatar_limite)
 
 ASSETS = Path(__file__).parent / "assets"
 
@@ -184,10 +185,10 @@ if not st.session_state.get("logado"):
 # ---------------------------------------------------------------- dados
 @st.cache_data(ttl=300, show_spinner="Carregando dados...")
 def dados():
-    return carregar_giros()
+    return carregar_giros(), carregar_limites()
 
 
-por_mesa = dados()
+por_mesa, limites = dados()
 
 topo, sair = st.columns([6, 1], vertical_alignment="center")
 topo.markdown(
@@ -214,7 +215,12 @@ if atraso > timedelta(minutes=75):
 
 c1, c2, c3 = st.columns(3)
 mesa = c1.selectbox("Roleta", sorted(por_mesa))
-padrao = c2.selectbox("Padrão", list(PADROES))
+limite_mesa = limites.get(mesa)
+padrao = c2.selectbox(
+    "Padrão",
+    list(PADROES),
+    format_func=lambda p: f"{p}  ({formatar_limite(limite_mesa)})" if limite_mesa else p,
+)
 periodo = c3.selectbox("Período", list(PERIODOS), index=1)
 
 giros = filtrar_periodo(por_mesa[mesa], periodo)

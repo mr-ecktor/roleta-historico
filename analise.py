@@ -10,11 +10,19 @@ Regras:
 """
 
 import csv
+import json
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from coletor import MESAS
+from coletor import ARQUIVO_LIMITES, MESAS_ATIVAS
+
+# Nomes usados nos CSVs antigos -> nome atual
+NOMES_ANTIGOS = {"Auto Roulette": "Auto Roulette (Evolution)"}
+
+# Limites de aposta das mesas Evolution (não há fonte pública; valores do painel "Limites" do cassino).
+# Formato: "Nome da mesa": {"min": 0.5, "max": 25000, "moeda": "BRL"}
+LIMITES_MANUAIS = {}
 
 PASTA_DADOS = Path(__file__).parent / "dados"
 FUSO_BRASILIA = timezone(timedelta(hours=-3))
@@ -59,20 +67,38 @@ PERIODOS = {
 def carregar_giros(pasta=PASTA_DADOS):
     """Lê todos os CSVs e devolve {mesa: [(horario_utc, numero), ...]} em ordem cronológica.
     Só inclui as mesas que o coletor ainda monitora."""
-    mesas_ativas = set(MESAS.values())
+    mesas_ativas = set(MESAS_ATIVAS)
     por_mesa = {}
     vistos = set()
     for arquivo in sorted(Path(pasta).rglob("*.csv")):
         with open(arquivo, newline="", encoding="utf-8") as f:
             for linha in csv.DictReader(f):
-                if linha["mesa"] not in mesas_ativas or linha["id"] in vistos:
+                mesa = NOMES_ANTIGOS.get(linha["mesa"], linha["mesa"])
+                if mesa not in mesas_ativas or linha["id"] in vistos:
                     continue
                 vistos.add(linha["id"])
                 horario = datetime.fromisoformat(linha["finalizado_utc"].replace("Z", "+00:00"))
-                por_mesa.setdefault(linha["mesa"], []).append((horario, int(linha["numero"])))
+                por_mesa.setdefault(mesa, []).append((horario, int(linha["numero"])))
     for giros in por_mesa.values():
         giros.sort()
     return por_mesa
+
+
+def carregar_limites():
+    """{mesa: {"min", "max", "moeda"}} — automáticos (Pragmatic) + manuais (Evolution)."""
+    limites = {}
+    if ARQUIVO_LIMITES.exists():
+        limites = json.loads(ARQUIVO_LIMITES.read_text(encoding="utf-8"))
+    return {**limites, **LIMITES_MANUAIS}
+
+
+def formatar_limite(lim):
+    """Ex.: {"min": 0.5, "max": 25000} -> "R$ 0,50 – 25.000"."""
+    def reais(v):
+        texto = f"{v:,.2f}" if v % 1 else f"{v:,.0f}"
+        return texto.replace(",", "X").replace(".", ",").replace("X", ".")
+    simbolo = "R$ " if lim.get("moeda", "BRL") == "BRL" else f'{lim["moeda"]} '
+    return f'{simbolo}{reais(lim["min"])} – {reais(lim["max"])}'
 
 
 def filtrar_periodo(giros, periodo, agora=None):

@@ -24,6 +24,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Instalar dependências
+        run: pip install websockets
+
       - name: Executar coletor
         run: python coletor.py
 
