@@ -249,6 +249,17 @@ padrao = c2.selectbox(
 )
 periodo = c3.selectbox("Período", list(PERIODOS), index=1)
 
+with st.expander("Como ler esta análise"):
+    st.markdown(
+        """
+- **Rodadas sem sair**: por quantas rodadas seguidas o padrão **não** apareceu. O **zero conta como "não saiu"** para todos os padrões.
+- **Vezes**: quantas vezes aconteceu uma ausência exatamente desse tamanho no período escolhido.
+- **Ranking das mesas**: compara todas as mesas no padrão e período escolhidos pelo **recorde** (maior sequência sem sair) de cada categoria. Fica em 1º a mesa cujo pior recorde é o menor; empates são desempatados pela soma dos recordes. Mesas com mais rodadas analisadas tendem a ter recordes maiores — confira a coluna *Rodadas*.
+- A ausência que ainda está em andamento (o padrão ainda não voltou a sair) só entra na contagem quando termina.
+- Cada rodada é independente: um padrão estar há muito tempo sem sair **não aumenta** a chance de ele sair na próxima.
+"""
+    )
+
 giros = filtrar_periodo(por_mesa[mesa], periodo)
 if not giros:
     st.warning("Nenhuma rodada registrada nesse período.")
@@ -330,15 +341,4 @@ if linhas_ranking:
         f'<div class="card ranking"><div class="rolagem"><table><tr><th>#</th><th>Mesa</th>{cab}'
         f'<th class="c">Rodadas</th><th>Limite</th></tr>{"".join(corpo)}</table></div></div>',
         unsafe_allow_html=True,
-    )
-
-with st.expander("Como ler esta análise"):
-    st.markdown(
-        """
-- **Rodadas sem sair**: por quantas rodadas seguidas o padrão **não** apareceu. O **zero conta como "não saiu"** para todos os padrões.
-- **Vezes**: quantas vezes aconteceu uma ausência exatamente desse tamanho no período escolhido.
-- **Ranking das mesas**: compara todas as mesas no padrão e período escolhidos pelo **recorde** (maior sequência sem sair) de cada categoria. Fica em 1º a mesa cujo pior recorde é o menor; empates são desempatados pela soma dos recordes. Mesas com mais rodadas analisadas tendem a ter recordes maiores — confira a coluna *Rodadas*.
-- A ausência que ainda está em andamento (o padrão ainda não voltou a sair) só entra na contagem quando termina.
-- Cada rodada é independente: um padrão estar há muito tempo sem sair **não aumenta** a chance de ele sair na próxima.
-"""
     )
