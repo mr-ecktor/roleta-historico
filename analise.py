@@ -5,8 +5,8 @@ Regras:
 - O zero conta como "não saiu" para todos os padrões.
 - Só entram na contagem ausências completas (que terminaram quando o padrão voltou a sair).
   A ausência ainda em andamento é informada à parte.
-- Se houver uma falha na coleta (intervalo grande entre duas rodadas), a contagem
-  recomeça, para não emendar rodadas que não foram registradas.
+- Se houver uma falha na coleta (intervalo grande entre duas rodadas, ou um giro faltando),
+  a contagem recomeça, para não emendar rodadas que não foram registradas.
 """
 
 import csv
@@ -32,6 +32,8 @@ LIMITES_MANUAIS = {
 PASTA_DADOS = Path(__file__).parent / "dados"
 FUSO_BRASILIA = timezone(timedelta(hours=-3))
 INTERVALO_MAXIMO = timedelta(minutes=10)  # acima disso consideramos falha na coleta
+FATOR_GIRO_FALTANDO = 1.6  # intervalo acima de 1,6x o ritmo normal da mesa = provável giro faltando
+DUPLICADO = timedelta(seconds=15)  # mesmo número na mesma mesa com menos que isso = mesmo giro (fontes diferentes)
 
 VERMELHOS = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
 
@@ -86,6 +88,13 @@ def carregar_giros(pasta=PASTA_DADOS):
                 por_mesa.setdefault(mesa, []).append((horario, int(linha["numero"])))
     for giros in por_mesa.values():
         giros.sort()
+        # Remove o mesmo giro registrado por duas fontes (ex.: Immersive, que mudou de fonte)
+        unicos = []
+        for g in giros:
+            if unicos and g[1] == unicos[-1][1] and g[0] - unicos[-1][0] < DUPLICADO:
+                continue
+            unicos.append(g)
+        giros[:] = unicos
     return por_mesa
 
 
@@ -116,10 +125,23 @@ def filtrar_periodo(giros, periodo, agora=None):
 
 
 def dividir_em_trechos(giros):
-    """Separa os giros em trechos contínuos (sem falhas de coleta)."""
+    """
+    Separa os giros em trechos contínuos (sem falhas de coleta).
+    Além de falhas longas, detecta giros faltando: se o intervalo entre dois giros passa de
+    FATOR_GIRO_FALTANDO x o ritmo normal da mesa (mediana), provavelmente falta um giro ali,
+    e emendar os dois lados criaria sequências falsas.
+    """
+    intervalos = sorted(
+        (b[0] - a[0]).total_seconds() for a, b in zip(giros, giros[1:])
+        if b[0] - a[0] <= INTERVALO_MAXIMO
+    )
+    limite = INTERVALO_MAXIMO
+    if len(intervalos) >= 10:
+        mediana = intervalos[len(intervalos) // 2]
+        limite = min(INTERVALO_MAXIMO, timedelta(seconds=mediana * FATOR_GIRO_FALTANDO))
     trechos, atual = [], []
     for g in giros:
-        if atual and g[0] - atual[-1][0] > INTERVALO_MAXIMO:
+        if atual and g[0] - atual[-1][0] > limite:
             trechos.append(atual)
             atual = []
         atual.append(g)

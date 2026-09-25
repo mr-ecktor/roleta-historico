@@ -237,7 +237,7 @@ partes = [
     f"<span>De <b>{primeiro:%d/%m %H:%M}</b> até <b>{ultimo:%d/%m %H:%M}</b> (Brasília)</span>",
 ]
 if len(tamanhos) > 1:
-    partes.append(f'<span class="alerta">⚠ {len(tamanhos) - 1} falha(s) de coleta — a contagem recomeça após cada uma</span>')
+    partes.append(f'<span class="alerta">⚠ {len(tamanhos) - 1} interrupção(ões) no período (pausa da mesa ou giro não registrado) — a contagem recomeça após cada uma</span>')
 st.markdown(f'<div class="resumo">{"".join(partes)}</div>', unsafe_allow_html=True)
 
 

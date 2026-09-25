@@ -23,13 +23,14 @@ from pathlib import Path
 
 # Evolution via CasinoScores: "nome na API do CasinoScores": "nome amigável"
 MESAS_EVOLUTION = {
-    "immersiveroulette": "Immersive Roulette",
-    "autoroulette": "Auto Roulette (Evolution)",
+    "autoroulette": "Auto Roulette (Evolution)",  # o TipMiner não acompanha esta mesa
+    # Immersive passou para o TipMiner: o CasinoScores perdia ~7% dos giros dela
     # Removidas: Fireball (fonte com pouco histórico); Gold Vault, Red Door, Lightning e XXXtreme Lightning (a pedido)
 }
 
 # Evolution via TipMiner (mesas que o CasinoScores não acompanha): "id público (pid)": "nome amigável"
 MESAS_TIPMINER = {
+    "dfa678e4-4452-4723-a97d-f3703302d5cc": "Immersive Roulette",
     "b79aa4ce-82f0-4590-9bfd-efd3b7367c8a": "Auto-Roulette VIP",
     "d5ac92b3-d28e-4a3d-8117-9695a24c0053": "Roleta Ao Vivo",
 }
