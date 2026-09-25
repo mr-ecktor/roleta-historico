@@ -21,7 +21,7 @@ MESAS = {
     "autoroulette": "Auto Roulette",
     "goldvaultroulette": "Gold Vault Roulette",
     "reddoorroulette": "Red Door Roulette",
-    "fireballroulette": "Fireball Roulette",
+    # Fireball Roulette foi removida: a fonte guarda só ~1h de histórico e o registro ficava com buracos
 }
 
 URL_API = (

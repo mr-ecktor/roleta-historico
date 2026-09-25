@@ -14,6 +14,8 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from coletor import MESAS
+
 PASTA_DADOS = Path(__file__).parent / "dados"
 FUSO_BRASILIA = timezone(timedelta(hours=-3))
 INTERVALO_MAXIMO = timedelta(minutes=10)  # acima disso consideramos falha na coleta
@@ -55,13 +57,15 @@ PERIODOS = {
 
 
 def carregar_giros(pasta=PASTA_DADOS):
-    """Lê todos os CSVs e devolve {mesa: [(horario_utc, numero), ...]} em ordem cronológica."""
+    """Lê todos os CSVs e devolve {mesa: [(horario_utc, numero), ...]} em ordem cronológica.
+    Só inclui as mesas que o coletor ainda monitora."""
+    mesas_ativas = set(MESAS.values())
     por_mesa = {}
     vistos = set()
     for arquivo in sorted(Path(pasta).rglob("*.csv")):
         with open(arquivo, newline="", encoding="utf-8") as f:
             for linha in csv.DictReader(f):
-                if linha["id"] in vistos:
+                if linha["mesa"] not in mesas_ativas or linha["id"] in vistos:
                     continue
                 vistos.add(linha["id"])
                 horario = datetime.fromisoformat(linha["finalizado_utc"].replace("Z", "+00:00"))
