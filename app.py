@@ -83,7 +83,7 @@ div[data-baseweb="select"] > div:hover { border-color: var(--laranja) !important
 .stButton button[kind="secondary"]:hover { border-color: var(--laranja); color: var(--laranja); }
 
 /* Cabeçalho */
-.cabecalho { display: flex; align-items: center; gap: 1rem; }
+.cabecalho { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.6rem; }
 .cabecalho img { height: 92px; filter: drop-shadow(0 0 18px rgba(255, 106, 0, .45)); }
 .marca {
     font-family: 'Sora', sans-serif; font-size: .78rem; font-weight: 700; letter-spacing: .32em;
@@ -249,6 +249,45 @@ padrao = c2.selectbox(
 )
 periodo = c3.selectbox("Período", list(PERIODOS), index=1)
 
+# ---------------------------------------------------------------- ranking das mesas
+def ranking_mesas(padrao, periodo):
+    """Mesas ordenadas pela maior ausência registrada (recorde) do padrão, da menor para a maior."""
+    linhas = []
+    for nome_mesa, todos in por_mesa.items():
+        giros_mesa = filtrar_periodo(todos, periodo)
+        if not giros_mesa:
+            continue
+        res, _ = analisar(giros_mesa, padrao)
+        recordes = {cat: (max(r["contagem"]) if r["contagem"] else None) for cat, r in res.items()}
+        validos = [v for v in recordes.values() if v is not None]
+        chave = (max(validos), sum(validos)) if validos else (float("inf"), float("inf"))
+        linhas.append((chave, nome_mesa, recordes, len(giros_mesa)))
+    linhas.sort(key=lambda x: x[0])
+    return linhas
+
+
+linhas_ranking = ranking_mesas(padrao, periodo)
+if linhas_ranking:
+    categorias = list(PADROES[padrao])
+    cab = "".join(f"<th class='c'>{escape(c)}</th>" for c in categorias)
+    corpo = []
+    for pos, (_, nome_mesa, recordes, qtd) in enumerate(linhas_ranking, start=1):
+        cels = "".join(f"<td class='c'>{'—' if recordes[c] is None else recordes[c]}</td>" for c in categorias)
+        lim = limites.get(nome_mesa)
+        destaque = " class='lider'" if pos == 1 else ""
+        qtd_fmt = f"{qtd:,}".replace(",", ".")
+        corpo.append(
+            f"<tr{destaque}><td class='pos'>{pos}º</td><td>{escape(nome_mesa)}</td>{cels}"
+            f"<td class='c'>{qtd_fmt}</td><td>{formatar_limite(lim) if lim else '—'}</td></tr>"
+        )
+    st.markdown(
+        f'<p class="secao">Ranking das mesas <span>· {escape(padrao)} · {escape(periodo)}</span></p>'
+        '<p class="secao-sub">Maior sequência sem sair de cada categoria. Quanto menor o recorde, mais alto no ranking.</p>'
+        f'<div class="card ranking"><div class="rolagem"><table><tr><th>#</th><th>Mesa</th>{cab}'
+        f'<th class="c">Rodadas</th><th>Limite</th></tr>{"".join(corpo)}</table></div></div>',
+        unsafe_allow_html=True,
+    )
+
 with st.expander("Como ler esta análise"):
     st.markdown(
         """
@@ -302,43 +341,3 @@ colunas = st.columns(len(resultado))
 for i, (coluna, (nome, r)) in enumerate(zip(colunas, resultado.items())):
     cor = CORES_CATEGORIA.get(nome, LARANJAS[i % 3])
     coluna.markdown(cartao(nome, cor, r["contagem"], compacto=len(resultado) > 2), unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------- ranking das mesas
-def ranking_mesas(padrao, periodo):
-    """Mesas ordenadas pela maior ausência registrada (recorde) do padrão, da menor para a maior."""
-    linhas = []
-    for nome_mesa, todos in por_mesa.items():
-        giros_mesa = filtrar_periodo(todos, periodo)
-        if not giros_mesa:
-            continue
-        res, _ = analisar(giros_mesa, padrao)
-        recordes = {cat: (max(r["contagem"]) if r["contagem"] else None) for cat, r in res.items()}
-        validos = [v for v in recordes.values() if v is not None]
-        chave = (max(validos), sum(validos)) if validos else (float("inf"), float("inf"))
-        linhas.append((chave, nome_mesa, recordes, len(giros_mesa)))
-    linhas.sort(key=lambda x: x[0])
-    return linhas
-
-
-linhas_ranking = ranking_mesas(padrao, periodo)
-if linhas_ranking:
-    categorias = list(PADROES[padrao])
-    cab = "".join(f"<th class='c'>{escape(c)}</th>" for c in categorias)
-    corpo = []
-    for pos, (_, nome_mesa, recordes, qtd) in enumerate(linhas_ranking, start=1):
-        cels = "".join(f"<td class='c'>{'—' if recordes[c] is None else recordes[c]}</td>" for c in categorias)
-        lim = limites.get(nome_mesa)
-        destaque = " class='lider'" if pos == 1 else ""
-        qtd_fmt = f"{qtd:,}".replace(",", ".")
-        corpo.append(
-            f"<tr{destaque}><td class='pos'>{pos}º</td><td>{escape(nome_mesa)}</td>{cels}"
-            f"<td class='c'>{qtd_fmt}</td><td>{formatar_limite(lim) if lim else '—'}</td></tr>"
-        )
-    st.markdown(
-        f'<p class="secao">Ranking das mesas <span>· {escape(padrao)} · {escape(periodo)}</span></p>'
-        '<p class="secao-sub">Maior sequência sem sair de cada categoria. Quanto menor o recorde, mais alto no ranking.</p>'
-        f'<div class="card ranking"><div class="rolagem"><table><tr><th>#</th><th>Mesa</th>{cab}'
-        f'<th class="c">Rodadas</th><th>Limite</th></tr>{"".join(corpo)}</table></div></div>',
-        unsafe_allow_html=True,
-    )
