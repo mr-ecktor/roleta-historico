@@ -115,7 +115,8 @@ def simular(giros, padrao, categoria, gatilho, fichas, banca, limite_max=None):
                 sem_sair += 1
 
             # próxima aposta: continua o ciclo ou entra pelo gatilho
-            if ciclo is None and not aguardar_saida and sem_sair == gatilho:
+            # gatilho 0 = aposta direta: entra em todo giro em que não houver ciclo aberto
+            if ciclo is None and (gatilho == 0 or (not aguardar_saida and sem_sair == gatilho)):
                 ciclo = {"inicio": horario, "nivel": 0, "lucro": 0.0, "maior_aposta": 0.0}
 
             if ciclo is not None and fichas[ciclo["nivel"]] > saldo + 1e-9:
@@ -252,7 +253,8 @@ class SimulacaoAoVivo:
 
     def _preparar_apostas(self, horario):
         for robo in self.robos:
-            if robo.ciclo is None and not robo.aguardar_saida and robo.sem_sair == self.gatilho:
+            # gatilho 0 = aposta direta: entra em todo giro em que não houver ciclo aberto
+            if robo.ciclo is None and (self.gatilho == 0 or (not robo.aguardar_saida and robo.sem_sair == self.gatilho)):
                 robo.ciclo = {"inicio": horario, "nivel": 0, "lucro": 0.0}
                 robo.entradas += 1
         total = sum(r.aposta_atual for r in self.robos)
@@ -274,6 +276,8 @@ class SimulacaoAoVivo:
         if robo.ciclo is not None:
             nivel = robo.ciclo["nivel"]
             return f"apostando {robo.aposta_atual:.2f}".replace(".", ",") + (" (entrada)" if nivel == 0 else f" (recuperação {nivel})")
+        if self.gatilho == 0:
+            return "aposta direta — entra no próximo giro"
         if robo.sem_sair is None:
             return "aguardando sair para começar a contar"
         if robo.aguardar_saida:
