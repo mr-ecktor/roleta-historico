@@ -218,11 +218,9 @@ topo.markdown(
 if sair.button("Sair", key="sair"):
     st.session_state.logado = False
     st.rerun()
-SUBTITULOS = {
-    "Análise": "Quantas vezes cada padrão ficou X rodadas seguidas sem sair.",
-    "Simulador": "Teste uma estratégia com recuperação nos giros reais coletados — sem apostar dinheiro.",
-}
-st.markdown(f'<p class="subtitulo">{SUBTITULOS[modo]}</p>', unsafe_allow_html=True)
+if modo == "Simulador":
+    st.markdown('<p class="subtitulo">Teste uma estratégia com recuperação nos giros reais coletados — sem apostar dinheiro.</p>',
+                unsafe_allow_html=True)
 
 # Alerta de dados atrasados (coleta normal: a cada 5 min)
 ultimo_giro = max(g[-1][0] for g in por_mesa.values())
