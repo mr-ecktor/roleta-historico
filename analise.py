@@ -202,7 +202,7 @@ def tabela(resultado_categoria, tamanhos):
 if __name__ == "__main__":
     # Teste rápido pelo terminal
     dados = carregar_giros()
-    mesa = "Lightning Roulette"
+    mesa = "Immersive Roulette"
     giros = filtrar_periodo(dados[mesa], "Tudo")
     res, tamanhos = analisar(giros, "Vermelho / Preto")
     print(f"{mesa}: {len(giros)} giros em {len(tamanhos)} trecho(s)\n")

@@ -1,7 +1,8 @@
 """
 Coletor de resultados de roletas ao vivo (Evolution e Pragmatic Play).
 
-- Evolution: busca as últimas ~500 rodadas de cada mesa no CasinoScores.
+- Evolution: busca as últimas ~500 rodadas de cada mesa no CasinoScores, e no TipMiner
+  (últimas 200) as mesas que o CasinoScores não acompanha.
 - Pragmatic Play: lê o canal público de lobby da Pragmatic (últimos 20 resultados
   e limites de aposta de cada mesa). Como são só ~10 min de histórico,
   a coleta precisa rodar a cada 5 minutos.
@@ -20,13 +21,17 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# Evolution: "nome na API do CasinoScores": "nome amigável"
+# Evolution via CasinoScores: "nome na API do CasinoScores": "nome amigável"
 MESAS_EVOLUTION = {
-    "lightningroulette": "Lightning Roulette",
-    "xxxtremelightningroulette": "XXXtreme Lightning Roulette",
     "immersiveroulette": "Immersive Roulette",
     "autoroulette": "Auto Roulette (Evolution)",
-    # Removidas: Fireball (fonte com pouco histórico), Gold Vault e Red Door (a pedido)
+    # Removidas: Fireball (fonte com pouco histórico); Gold Vault, Red Door, Lightning e XXXtreme Lightning (a pedido)
+}
+
+# Evolution via TipMiner (mesas que o CasinoScores não acompanha): "id público (pid)": "nome amigável"
+MESAS_TIPMINER = {
+    "b79aa4ce-82f0-4590-9bfd-efd3b7367c8a": "Auto-Roulette VIP",
+    "d5ac92b3-d28e-4a3d-8117-9695a24c0053": "Roleta Ao Vivo",
 }
 
 # Pragmatic Play: "id da mesa no lobby": "nome amigável"
@@ -36,12 +41,13 @@ MESAS_PRAGMATIC = {
     "226": "Speed Auto Roulette (Pragmatic)",
 }
 
-MESAS_ATIVAS = list(MESAS_EVOLUTION.values()) + list(MESAS_PRAGMATIC.values())
+MESAS_ATIVAS = list(MESAS_EVOLUTION.values()) + list(MESAS_TIPMINER.values()) + list(MESAS_PRAGMATIC.values())
 
 URL_EVOLUTION = (
     "https://api.casinoscores.com/svc-evolution-game-events/api/{mesa}"
     "?page=0&size=500&sort=data.settledAt,desc&duration=24"
 )
+URL_TIPMINER = "https://api.core.public.tipminer.com/v1/roulette/rounds/{pid}/history?limit=200"
 URL_PRAGMATIC = "wss://dga.pragmaticplaylive.net/ws"
 CASSINO_PRAGMATIC = "ppcdk00000005349"  # identificador público de lobby usado para leitura
 
@@ -86,6 +92,23 @@ def coletar_evolution(mesa, nome):
             sorte = " ".join(f'{n["number"]}x{n["roundedMultiplier"]}' for n in d["result"].get("luckyNumbersList") or [])
             finalizado = datetime.fromisoformat(d["settledAt"].replace("Z", "+00:00"))
             rodadas.append(linha(item["id"], nome, int(numero), finalizado, d.get("startedAt", ""), sorte))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return rodadas
+
+
+# ---------------------------------------------------------------- TipMiner (Evolution)
+def coletar_tipminer(pid, nome):
+    req = urllib.request.Request(URL_TIPMINER.format(pid=pid), headers={
+        "User-Agent": "Mozilla/5.0", "Origin": "https://www.tipminer.com", "Referer": "https://www.tipminer.com/",
+    })
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        itens = json.load(resp)
+    rodadas = []
+    for item in itens:
+        try:
+            finalizado = datetime.fromisoformat(item["instant"].replace("Z", "+00:00"))
+            rodadas.append(linha(f'tm-{item["uuid"]}', nome, int(item["result"]), finalizado))
         except (KeyError, TypeError, ValueError):
             continue
     return rodadas
@@ -196,6 +219,14 @@ def main():
             problemas.append(f"{nome}: erro ao consultar o CasinoScores ({erro})")
             com_erro.add(nome)
         time.sleep(1)  # pausa curta para não sobrecarregar o site
+
+    for pid, nome in MESAS_TIPMINER.items():
+        try:
+            por_mesa[nome] = coletar_tipminer(pid, nome)
+        except Exception as erro:
+            problemas.append(f"{nome}: erro ao consultar o TipMiner ({erro})")
+            com_erro.add(nome)
+        time.sleep(1)
 
     try:
         rodadas_pp, limites = coletar_pragmatic()
