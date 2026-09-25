@@ -247,9 +247,7 @@ def painel_ao_vivo():
     # Entradas = apostas feitas (cada linha do histórico com aposta), incluindo as de recuperação
     apostas = [h for h in sim.historico if h["aposta"]]
     qtd_ganhou = sum(1 for h in apostas if h["resultado"] == "Ganhou")
-    qtd_perdeu = len(apostas) - qtd_ganhou
     ganhas = f"{qtd_ganhou} ganha" + ("" if qtd_ganhou == 1 else "s")
-    perdidas = f"{qtd_perdeu} perdida" + ("" if qtd_perdeu == 1 else "s")
     estouros = f"{r['estouros']} estouro" + ("" if r["estouros"] == 1 else "s")
     maior = max(sim.robos, key=lambda x: x.max_sem_sair)
     detalhe_max = (" · ".join(f"{x.categoria} {x.max_sem_sair}" for x in sim.robos) if len(sim.robos) > 1
@@ -258,7 +256,7 @@ def painel_ao_vivo():
         ("Saldo inicial", reais(sim.banca), "banca no Start", False),
         ("Saldo final", reais(sim.saldo), f"{'lucro' if lucro > 0 else 'prejuízo' if lucro < 0 else 'resultado'}: "
                                           f"{reais(lucro, sinal=True)}", True),
-        ("Entradas", str(len(apostas)), f"{ganhas} · {perdidas} · {estouros}", False),
+        ("Entradas", str(len(apostas)), f"{ganhas} · {estouros}", False),
         ("Máx. sem sair", str(maior.max_sem_sair), detalhe_max, False),
     ]
     st.markdown(
