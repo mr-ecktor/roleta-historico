@@ -209,9 +209,14 @@ topo.markdown(
 if sair.button("Sair", use_container_width=True):
     st.session_state.logado = False
     st.rerun()
-st.markdown('<p class="subtitulo">Quantas vezes cada padrão ficou X rodadas seguidas sem sair.</p>', unsafe_allow_html=True)
+modo = st.segmented_control("Modo", ["Análise", "Simulador"], default="Análise", label_visibility="collapsed") or "Análise"
+SUBTITULOS = {
+    "Análise": "Quantas vezes cada padrão ficou X rodadas seguidas sem sair.",
+    "Simulador": "Teste uma estratégia com recuperação nos giros reais coletados — sem apostar dinheiro.",
+}
+st.markdown(f'<p class="subtitulo">{SUBTITULOS[modo]}</p>', unsafe_allow_html=True)
 
-# Alerta de dados atrasados (coleta normal: a cada 30 min)
+# Alerta de dados atrasados (coleta normal: a cada 5 min)
 ultimo_giro = max(g[-1][0] for g in por_mesa.values())
 atraso = datetime.now(timezone.utc) - ultimo_giro
 if atraso > timedelta(minutes=75):
@@ -222,6 +227,11 @@ if atraso > timedelta(minutes=75):
         'Verifique o cron-job.org e a aba Actions do GitHub.</span></div>',
         unsafe_allow_html=True,
     )
+
+if modo == "Simulador":
+    from pagina_simulador import pagina_simulador
+    pagina_simulador(por_mesa, limites)
+    st.stop()
 
 c1, c2, c3 = st.columns(3)
 mesa = c1.selectbox("Roleta", sorted(por_mesa))
