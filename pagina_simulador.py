@@ -244,8 +244,8 @@ def painel_ao_vivo():
     # Blocos de resumo
     r = sim.resumo
     lucro = sim.saldo - sim.banca
-    total_ganho = sum(h["lucro"] for h in sim.historico if h["resultado"] == "Ganhou")
-    ganhas = f"ganhou {reais(total_ganho)}"
+    qtd_ganhou = sum(1 for h in sim.historico if h["resultado"] == "Ganhou")  # linhas "Ganhou" do histórico
+    ganhas = f"{qtd_ganhou} ganha" + ("" if qtd_ganhou == 1 else "s")
     estouros = f"{r['estouros']} estouro" + ("" if r["estouros"] == 1 else "s")
     maior = max(sim.robos, key=lambda x: x.max_sem_sair)
     detalhe_max = (" · ".join(f"{x.categoria} {x.max_sem_sair}" for x in sim.robos) if len(sim.robos) > 1
