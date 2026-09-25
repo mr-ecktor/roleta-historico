@@ -282,7 +282,7 @@ if linhas_ranking:
         )
     st.markdown(
         f'<p class="secao">Ranking das mesas <span>· {escape(padrao)} · {escape(periodo)}</span></p>'
-        '<p class="secao-sub">Maior sequência sem sair de cada categoria. Quanto menor o recorde, mais alto no ranking.</p>'
+        '<p class="secao-sub">Maior sequência sem sair de cada categoria. Ranking da melhor mesa para a pior no padrão e período selecionado.</p>'
         f'<div class="card ranking"><div class="rolagem"><table><tr><th>#</th><th>Mesa</th>{cab}'
         f'<th class="c">Rodadas</th><th>Limite</th></tr>{"".join(corpo)}</table></div></div>',
         unsafe_allow_html=True,
