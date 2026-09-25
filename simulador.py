@@ -160,8 +160,9 @@ CATEGORIAS = {cat: padrao for padrao, cats in PADROES.items() for cat in cats}
 class _Robo:
     """Uma categoria apostada (ex.: "Par"), com gatilho, ciclo e recuperação próprios."""
 
-    def __init__(self, categoria, fichas):
+    def __init__(self, categoria, fichas, gatilho):
         self.categoria = categoria
+        self.gatilho = gatilho
         self.padrao = CATEGORIAS[categoria]
         self.saiu = PADROES[self.padrao][categoria]
         self.fichas = fichas
@@ -184,9 +185,12 @@ class SimulacaoAoVivo:
 
     INTERVALO_MAXIMO_S = 180  # sem giro novo por mais que isso = pausa da mesa: ciclos em andamento são encerrados
 
-    def __init__(self, categorias, gatilho, fichas_por_padrao, banca, limite_max=None):
-        self.robos = [_Robo(c, fichas_por_padrao[CATEGORIAS[c]]) for c in categorias]
-        self.gatilho, self.banca, self.limite_max = gatilho, banca, limite_max
+    def __init__(self, categorias, gatilhos, fichas_por_padrao, banca, limite_max=None):
+        """gatilhos: um número para todos, ou {categoria: número}."""
+        if not isinstance(gatilhos, dict):
+            gatilhos = {c: gatilhos for c in categorias}
+        self.robos = [_Robo(c, fichas_por_padrao[CATEGORIAS[c]], gatilhos[c]) for c in categorias]
+        self.banca, self.limite_max = banca, limite_max
         self.saldo = banca
         self.historico = []  # uma linha por aposta resolvida
         self.ultimo_horario = None
@@ -254,7 +258,7 @@ class SimulacaoAoVivo:
     def _preparar_apostas(self, horario):
         for robo in self.robos:
             # gatilho 0 = aposta direta: entra em todo giro em que não houver ciclo aberto
-            if robo.ciclo is None and (self.gatilho == 0 or (not robo.aguardar_saida and robo.sem_sair == self.gatilho)):
+            if robo.ciclo is None and (robo.gatilho == 0 or (not robo.aguardar_saida and robo.sem_sair == robo.gatilho)):
                 robo.ciclo = {"inicio": horario, "nivel": 0, "lucro": 0.0}
                 robo.entradas += 1
         total = sum(r.aposta_atual for r in self.robos)
@@ -276,13 +280,13 @@ class SimulacaoAoVivo:
         if robo.ciclo is not None:
             nivel = robo.ciclo["nivel"]
             return f"apostando {robo.aposta_atual:.2f}".replace(".", ",") + (" (entrada)" if nivel == 0 else f" (recuperação {nivel})")
-        if self.gatilho == 0:
+        if robo.gatilho == 0:
             return "aposta direta — entra no próximo giro"
         if robo.sem_sair is None:
             return "aguardando sair para começar a contar"
         if robo.aguardar_saida:
             return "estourou — aguardando sair de novo"
-        return f"{robo.sem_sair} sem sair — faltam {self.gatilho - robo.sem_sair} para entrar"
+        return f"{robo.sem_sair} sem sair — faltam {robo.gatilho - robo.sem_sair} para entrar"
 
     @property
     def resumo(self):

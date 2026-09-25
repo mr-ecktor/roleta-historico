@@ -17,6 +17,7 @@ from coletor import buscar_ao_vivo
 from simulador import CATEGORIAS, PAGAMENTO, SimulacaoAoVivo, niveis_tabela, sequencia_da_tabela
 
 ATUALIZAR_A_CADA_S = 10
+NOME_GRUPO = {1: "Cor, Par/Ímpar e Alto/Baixo", 2: "Dúzias e Colunas"}
 
 
 def reais(v, sinal=False):
@@ -38,6 +39,8 @@ CSS = """
     letter-spacing: .14em; text-transform: uppercase; color: var(--texto-2); }
 .stNumberInput input { background: rgba(22, 22, 26, .9) !important; }
 .stMultiSelect span[data-baseweb="tag"] { background: rgba(255, 106, 0, .18) !important; border: 1px solid rgba(255, 106, 0, .5); color: #fafafa; }
+.grupo { font-family: 'Sora', sans-serif; font-size: .82rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+          color: var(--laranja); margin: 1.2rem 0 -.1rem; }
 .fichas { font-size: .95rem; color: var(--texto-2); margin: .2rem 0 .8rem; }
 .fichas b { color: #fafafa; font-variant-numeric: tabular-nums; }
 .painel { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1.6rem; background: var(--fundo-card);
@@ -130,15 +133,33 @@ def pagina_simulador(por_mesa, limites):
     padroes_usados = list(dict.fromkeys(CATEGORIAS[c] for c in categorias))
 
     limite = limites.get(mesa)
-    max_niveis = min((niveis_tabela(p) for p in padroes_usados), default=niveis_tabela("Vermelho / Preto")) - 1
-    d1, d2, d3, d4 = st.columns(4)
-    gatilho = d1.number_input("Gatilho", min_value=0, max_value=50, value=5, step=1, key="sim_gatilho", disabled=rodando,
-                              help="Cada padrão entra quando completar esse número de rodadas seguidas sem sair. 0 = aposta direta: aposta desde o Start e continua apostando, mesmo depois de ganhar ou estourar.")
-    ficha = d2.number_input("Ficha inicial (R$)", min_value=0.10, max_value=10000.0, disabled=rodando,
-                            value=float(limite["min"]) if limite else 0.50, step=0.50, format="%.2f", key=f"sim_ficha_{mesa}")
-    max_rec = d3.number_input("Máx. recuperações", min_value=0, max_value=max_niveis, value=min(3, max_niveis), step=1,
-                              key="sim_rec", disabled=rodando,
-                              help="Até qual nível da sua tabela de recuperação cada padrão vai")
+    ficha_padrao = float(limite["min"]) if limite else 0.50
+    AJUDA_GATILHO = ("Entra quando o padrão completar esse número de rodadas seguidas sem sair. "
+                     "0 = aposta direta: aposta desde o Start e continua apostando, mesmo depois de ganhar ou estourar.")
+
+    # Um grupo de ajustes por tipo de aposta: 1 = cor, par/ímpar, alto/baixo (paga 1:1); 2 = dúzias e colunas (paga 2:1).
+    # Com os dois tipos selecionados, cada grupo tem gatilho, ficha e recuperação próprios.
+    grupos = sorted({PAGAMENTO[p] for p in padroes_usados}) or [1]
+    ajustes = {}
+    for g in grupos:
+        padrao_ref = "Dúzias" if g == 2 else "Vermelho / Preto"
+        max_niveis = niveis_tabela(padrao_ref) - 1
+        if len(grupos) > 1:
+            st.markdown(f'<p class="grupo">{NOME_GRUPO[g]}</p>', unsafe_allow_html=True)
+            d1, d2, d3, _ = st.columns(4)
+        else:
+            d1, d2, d3, d4 = st.columns(4)
+        ajustes[g] = {
+            "gatilho": d1.number_input("Gatilho", min_value=0, max_value=50, value=5, step=1, key=f"sim_gatilho_{g}",
+                                       disabled=rodando, help=AJUDA_GATILHO),
+            "ficha": d2.number_input("Ficha inicial (R$)", min_value=0.10, max_value=10000.0, value=ficha_padrao, step=0.50,
+                                     format="%.2f", key=f"sim_ficha_{g}_{mesa}", disabled=rodando),
+            "max_rec": d3.number_input("Máx. recuperações", min_value=0, max_value=max_niveis, value=min(3, max_niveis),
+                                       step=1, key=f"sim_rec_{g}", disabled=rodando,
+                                       help="Até qual nível da sua tabela de recuperação o robô vai"),
+        }
+    if len(grupos) > 1:
+        d4, _, _, _ = st.columns(4)
     banca = d4.number_input("Banca inicial (R$)", min_value=1.0, max_value=1_000_000.0, value=100.0, step=10.0,
                             format="%.2f", key="sim_banca", disabled=rodando)
 
@@ -146,7 +167,9 @@ def pagina_simulador(por_mesa, limites):
         aviso("Escolha pelo menos um padrão em <b>Apostar em</b>.")
         return
 
-    fichas_por_padrao = {p: sequencia_da_tabela(p, ficha, int(max_rec)) for p in padroes_usados}
+    fichas_por_padrao = {p: sequencia_da_tabela(p, ajustes[PAGAMENTO[p]]["ficha"], int(ajustes[PAGAMENTO[p]]["max_rec"]))
+                         for p in padroes_usados}
+    gatilhos = {c: int(ajustes[PAGAMENTO[CATEGORIAS[c]]]["gatilho"]) for c in categorias}
     risco_cada = {c: sum(fichas_por_padrao[CATEGORIAS[c]]) for c in categorias}
     risco_total = sum(risco_cada.values())
     texto_risco = f"Valor em risco por ciclo: <b>{reais(risco_total)}</b>"
@@ -161,11 +184,11 @@ def pagina_simulador(por_mesa, limites):
             tipos.setdefault(PAGAMENTO[p], p)
         for pagamento, p in sorted(tipos.items()):
             if len(tipos) > 1:
-                st.markdown("**Dúzias e Colunas**" if pagamento == 2 else "**Cor, Par/Ímpar e Alto/Baixo**")
+                st.markdown(f"**{NOME_GRUPO[pagamento]}**")
             st.markdown(tabela_niveis(fichas_por_padrao[p], p), unsafe_allow_html=True)
 
     maior_ficha = max(f[-1] for f in fichas_por_padrao.values())
-    if limite and ficha < limite["min"]:
+    if limite and min(a["ficha"] for a in ajustes.values()) < limite["min"]:
         alerta(f"A ficha inicial está abaixo do mínimo desta mesa ({formatar_limite(limite)}).")
     if limite and maior_ficha > limite["max"]:
         alerta(f"A última recuperação ({reais(maior_ficha)}) passa do máximo desta mesa ({formatar_limite(limite)}).")
@@ -180,7 +203,7 @@ def pagina_simulador(por_mesa, limites):
             except Exception as erro:
                 st.error(f"Não foi possível ler a mesa agora ({erro}). Tente de novo em alguns segundos.")
                 return
-            sim = SimulacaoAoVivo(categorias, int(gatilho), fichas_por_padrao, banca,
+            sim = SimulacaoAoVivo(categorias, gatilhos, fichas_por_padrao, banca,
                                   limite_max=limite["max"] if limite else None)
             sim.aquecer([(t, n) for t, n, _ in anteriores])
             st.session_state.ao_vivo = {
