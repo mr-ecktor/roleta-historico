@@ -133,6 +133,16 @@ div[data-baseweb="select"] > div:hover { border-color: var(--laranja) !important
 .rodadas { color: #d4d4d8; }
 .vazio { padding: .4rem 1.2rem 1.2rem; color: var(--texto-2); font-size: .9rem; }
 
+/* Ranking */
+.secao { font-family: 'Sora', sans-serif; font-size: 1.25rem; font-weight: 700; text-transform: uppercase; margin: 1.6rem 0 .1rem; color: #fafafa; }
+.secao span { color: var(--laranja); font-size: .85rem; font-weight: 600; text-transform: none; }
+.secao-sub { color: var(--texto-2); font-size: .88rem; margin: 0 0 .8rem; }
+.ranking .rolagem { overflow-x: auto; }
+.ranking th.c, .ranking td.c { text-align: center; }
+.ranking td { font-variant-numeric: tabular-nums; }
+.ranking td.pos { font-family: 'Sora', sans-serif; font-weight: 700; color: var(--texto-2); width: 3rem; }
+.ranking tr.lider td { background: rgba(255, 106, 0, .10); }
+.ranking tr.lider td.pos { background: var(--degrade); -webkit-background-clip: text; background-clip: text; color: transparent; }
 /* Login */
 .login-logo { text-align: center; margin: 5vh 0 1.2rem; }
 .login-logo img { width: min(220px, 60%); filter: drop-shadow(0 0 28px rgba(255, 106, 0, .45)); }
@@ -266,11 +276,52 @@ for i, (coluna, (nome, r)) in enumerate(zip(colunas, resultado.items())):
     cor = CORES_CATEGORIA.get(nome, LARANJAS[i % 3])
     coluna.markdown(cartao(nome, cor, r["contagem"], compacto=len(resultado) > 2), unsafe_allow_html=True)
 
+
+# ---------------------------------------------------------------- ranking das mesas
+def ranking_mesas(padrao, periodo):
+    """Mesas ordenadas pela maior ausência registrada (recorde) do padrão, da menor para a maior."""
+    linhas = []
+    for nome_mesa, todos in por_mesa.items():
+        giros_mesa = filtrar_periodo(todos, periodo)
+        if not giros_mesa:
+            continue
+        res, _ = analisar(giros_mesa, padrao)
+        recordes = {cat: (max(r["contagem"]) if r["contagem"] else None) for cat, r in res.items()}
+        validos = [v for v in recordes.values() if v is not None]
+        chave = (max(validos), sum(validos)) if validos else (float("inf"), float("inf"))
+        linhas.append((chave, nome_mesa, recordes, len(giros_mesa)))
+    linhas.sort(key=lambda x: x[0])
+    return linhas
+
+
+linhas_ranking = ranking_mesas(padrao, periodo)
+if linhas_ranking:
+    categorias = list(PADROES[padrao])
+    cab = "".join(f"<th class='c'>{escape(c)}</th>" for c in categorias)
+    corpo = []
+    for pos, (_, nome_mesa, recordes, qtd) in enumerate(linhas_ranking, start=1):
+        cels = "".join(f"<td class='c'>{'—' if recordes[c] is None else recordes[c]}</td>" for c in categorias)
+        lim = limites.get(nome_mesa)
+        destaque = " class='lider'" if pos == 1 else ""
+        qtd_fmt = f"{qtd:,}".replace(",", ".")
+        corpo.append(
+            f"<tr{destaque}><td class='pos'>{pos}º</td><td>{escape(nome_mesa)}</td>{cels}"
+            f"<td class='c'>{qtd_fmt}</td><td>{formatar_limite(lim) if lim else '—'}</td></tr>"
+        )
+    st.markdown(
+        f'<p class="secao">Ranking das mesas <span>· {escape(padrao)} · {escape(periodo)}</span></p>'
+        '<p class="secao-sub">Maior sequência sem sair de cada categoria. Quanto menor o recorde, mais alto no ranking.</p>'
+        f'<div class="card ranking"><div class="rolagem"><table><tr><th>#</th><th>Mesa</th>{cab}'
+        f'<th class="c">Rodadas</th><th>Limite</th></tr>{"".join(corpo)}</table></div></div>',
+        unsafe_allow_html=True,
+    )
+
 with st.expander("Como ler esta análise"):
     st.markdown(
         """
 - **Rodadas sem sair**: por quantas rodadas seguidas o padrão **não** apareceu. O **zero conta como "não saiu"** para todos os padrões.
 - **Vezes**: quantas vezes aconteceu uma ausência exatamente desse tamanho no período escolhido.
+- **Ranking das mesas**: compara todas as mesas no padrão e período escolhidos pelo **recorde** (maior sequência sem sair) de cada categoria. Fica em 1º a mesa cujo pior recorde é o menor; empates são desempatados pela soma dos recordes. Mesas com mais rodadas analisadas tendem a ter recordes maiores — confira a coluna *Rodadas*.
 - A ausência que ainda está em andamento (o padrão ainda não voltou a sair) só entra na contagem quando termina.
 - Cada rodada é independente: um padrão estar há muito tempo sem sair **não aumenta** a chance de ele sair na próxima.
 """
