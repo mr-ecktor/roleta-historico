@@ -22,7 +22,10 @@ NOMES_ANTIGOS = {"Auto Roulette": "Auto Roulette (Evolution)"}
 
 # Limites de aposta das mesas Evolution (não há fonte pública; valores do painel "Limites" do cassino).
 # Formato: "Nome da mesa": {"min": 0.5, "max": 25000, "moeda": "BRL"}
-LIMITES_MANUAIS = {}
+LIMITES_MANUAIS = {
+    "Immersive Roulette": {"min": 2.5, "max": 25000, "moeda": "BRL"},
+    "Auto Roulette (Evolution)": {"min": 0.5, "max": 25000, "moeda": "BRL"},
+}
 
 PASTA_DADOS = Path(__file__).parent / "dados"
 FUSO_BRASILIA = timezone(timedelta(hours=-3))
