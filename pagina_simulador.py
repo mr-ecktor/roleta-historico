@@ -47,8 +47,17 @@ CSS = """
               box-shadow: 0 0 10px #22c55e; animation: pulsa 1.4s infinite; }
 .ponto-parado { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; background: #71717a; margin-right: .45rem; }
 @keyframes pulsa { 50% { opacity: .35; } }
-.st-key-sim_start button { background: var(--degrade); border: none; color: #0b0b0d; font-family: 'Sora', sans-serif; font-weight: 700;
-                           box-shadow: 0 8px 28px -8px rgba(255, 106, 0, .7); }
+.st-key-sim_start button {
+    background: var(--degrade) !important; border: none !important; color: #0b0b0d !important; opacity: 1 !important;
+    font-family: 'Sora', sans-serif; font-weight: 700; letter-spacing: .02em;
+    box-shadow: 0 8px 28px -8px rgba(255, 106, 0, .7);
+}
+.st-key-sim_start button p { color: #0b0b0d !important; font-weight: 700; }
+.st-key-sim_start button:hover { filter: brightness(1.08); box-shadow: 0 10px 32px -6px rgba(255, 106, 0, .85); }
+.aviso-start { display: flex; align-items: center; gap: .8rem; background: var(--fundo-card); border: 1px solid var(--borda);
+               border-left: 3px solid var(--laranja); border-radius: 12px; padding: .85rem 1.1rem; color: #d4d4d8; font-size: .92rem; margin-top: .6rem; }
+.aviso-start b { color: var(--laranja); }
+.aviso-start .icone { font-size: 1.2rem; color: var(--laranja); }
 </style>
 """
 
@@ -135,8 +144,12 @@ def pagina_simulador(por_mesa, limites):
     if st.session_state.get("ao_vivo"):
         painel_ao_vivo()
     else:
-        st.info("Configure a estratégia e aperte **Start**. A simulação acompanha os giros reais da mesa a partir desse "
-                "momento, sem fazer apostas de verdade. Mantenha esta aba aberta enquanto ela roda.")
+        st.markdown(
+            '<div class="aviso-start"><span class="icone">◉</span><div>Configure a estratégia e aperte <b>Start</b>. '
+            'A simulação acompanha os giros reais da mesa a partir desse momento, sem fazer apostas de verdade. '
+            'Mantenha esta aba aberta enquanto ela roda.</div></div>',
+            unsafe_allow_html=True,
+        )
 
 
 @st.fragment(run_every=1)
