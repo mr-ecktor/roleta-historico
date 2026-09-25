@@ -150,7 +150,12 @@ st.markdown("\n".join(linha for linha in CSS.splitlines() if linha.strip()), uns
 
 # ---------------------------------------------------------------- login
 def senha_confere(usuario, senha):
-    cfg = st.secrets["login"]
+    try:
+        cfg = st.secrets["login"]
+        cfg["usuario"], cfg["sal"], cfg["senha_hash"]
+    except (KeyError, FileNotFoundError):
+        st.error("Login não configurado: cole o bloco [login] gerado por criar_senha.py nos Secrets do app.")
+        st.stop()
     hash_digitado = hashlib.pbkdf2_hmac("sha256", senha.encode(), bytes.fromhex(cfg["sal"]), 200_000).hex()
     return hmac.compare_digest(usuario, cfg["usuario"]) and hmac.compare_digest(hash_digitado, cfg["senha_hash"])
 
