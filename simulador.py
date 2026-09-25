@@ -152,107 +152,138 @@ def simular(giros, padrao, categoria, gatilho, fichas, banca, limite_max=None):
     }
 
 
-class SimulacaoAoVivo:
-    """
-    Mesma regra de `simular`, mas processando giro a giro, conforme os giros chegam ao vivo.
-    Guardada no session_state do site enquanto a página estiver aberta.
-    """
+# Todas as categorias apostáveis: rótulo -> padrão a que pertence
+CATEGORIAS = {cat: padrao for padrao, cats in PADROES.items() for cat in cats}
 
-    INTERVALO_MAXIMO_S = 180  # sem giro novo por mais que isso = pausa da mesa: ciclo em andamento é encerrado
 
-    def __init__(self, padrao, categoria, gatilho, fichas, banca, limite_max=None):
-        self.padrao, self.categoria, self.gatilho = padrao, categoria, gatilho
-        self.fichas, self.banca, self.limite_max = fichas, banca, limite_max
-        self.saldo = banca
+class _Robo:
+    """Uma categoria apostada (ex.: "Par"), com gatilho, ciclo e recuperação próprios."""
+
+    def __init__(self, categoria, fichas):
+        self.categoria = categoria
+        self.padrao = CATEGORIAS[categoria]
+        self.saiu = PADROES[self.padrao][categoria]
+        self.fichas = fichas
         self.sem_sair = None
         self.aguardar_saida = False
-        self.ciclo = None
-        self.ciclos = []
+        self.ciclo = None  # {"inicio", "nivel", "lucro"}
         self.max_sem_sair = 0
+        self.entradas = self.vitorias = self.estouros = 0
+
+    @property
+    def aposta_atual(self):
+        return self.fichas[self.ciclo["nivel"]] if self.ciclo else 0.0
+
+
+class SimulacaoAoVivo:
+    """
+    Simula um ou mais robôs (um por categoria escolhida) giro a giro, conforme os giros chegam ao vivo,
+    todos usando o mesmo caixa. Guardada no session_state do site enquanto a página estiver aberta.
+    """
+
+    INTERVALO_MAXIMO_S = 180  # sem giro novo por mais que isso = pausa da mesa: ciclos em andamento são encerrados
+
+    def __init__(self, categorias, gatilho, fichas_por_padrao, banca, limite_max=None):
+        self.robos = [_Robo(c, fichas_por_padrao[CATEGORIAS[c]]) for c in categorias]
+        self.gatilho, self.banca, self.limite_max = gatilho, banca, limite_max
+        self.saldo = banca
+        self.historico = []  # uma linha por aposta resolvida
         self.ultimo_horario = None
         self.giros_vistos = 0
         self.quebrou = False
 
-    def _saiu(self, numero):
-        return PADROES[self.padrao][self.categoria](numero)
-
+    # ---------------------------------------------------------------- giros
     def aquecer(self, giros):
-        """Usa giros anteriores ao Start só para saber há quantas rodadas a categoria está sem sair."""
+        """Usa giros anteriores ao Start só para saber há quantas rodadas cada categoria está sem sair."""
         for horario, numero in giros:
-            if self.ultimo_horario and (horario - self.ultimo_horario).total_seconds() > self.INTERVALO_MAXIMO_S:
-                self.sem_sair = None
-            self.sem_sair = 0 if self._saiu(numero) else (None if self.sem_sair is None else self.sem_sair + 1)
+            pausa = self.ultimo_horario and (horario - self.ultimo_horario).total_seconds() > self.INTERVALO_MAXIMO_S
+            for robo in self.robos:
+                if pausa:
+                    robo.sem_sair = None
+                robo.sem_sair = 0 if robo.saiu(numero) else (None if robo.sem_sair is None else robo.sem_sair + 1)
             self.ultimo_horario = horario
-        self._talvez_entrar(horario if giros else None)
+        self._preparar_apostas(self.ultimo_horario)
 
     def processar(self, horario, numero):
         if self.quebrou:
             return
         if self.ultimo_horario and (horario - self.ultimo_horario).total_seconds() > self.INTERVALO_MAXIMO_S:
-            if self.ciclo and self.ciclo["maior_aposta"] > 0:
-                self.ciclos.append({**self.ciclo, "fim": horario, "resultado": "Interrompido"})
-            self.ciclo, self.sem_sair, self.aguardar_saida = None, None, False
+            for robo in self.robos:
+                if robo.ciclo:
+                    self._registrar(horario, None, robo, 0.0, 0.0, "Interrompido (pausa da mesa)")
+                robo.ciclo, robo.sem_sair, robo.aguardar_saida = None, None, False
         self.ultimo_horario = horario
         self.giros_vistos += 1
-        acertou = self._saiu(numero)
 
-        if self.ciclo is not None:
-            aposta = self.fichas[self.ciclo["nivel"]]
-            self.ciclo["maior_aposta"] = aposta
-            if acertou:
-                ganho = aposta * PAGAMENTO[self.padrao]
-                self.saldo += ganho
-                self.ciclo["lucro"] += ganho
-                self.ciclos.append({**self.ciclo, "fim": horario, "resultado": "Ganhou"})
-                self.ciclo = None
-            else:
-                self.saldo -= aposta
-                self.ciclo["lucro"] -= aposta
-                proximo = self.ciclo["nivel"] + 1
-                if proximo >= len(self.fichas):
-                    self.ciclos.append({**self.ciclo, "fim": horario, "resultado": "Estourou"})
-                    self.ciclo, self.aguardar_saida = None, True
-                elif self.limite_max is not None and self.fichas[proximo] > self.limite_max:
-                    self.ciclos.append({**self.ciclo, "fim": horario, "resultado": "Limite da mesa"})
-                    self.ciclo, self.aguardar_saida = None, True
+        for robo in self.robos:
+            acertou = robo.saiu(numero)
+            if robo.ciclo is not None:
+                nivel = robo.ciclo["nivel"]
+                aposta = robo.fichas[nivel]
+                if acertou:
+                    ganho = aposta * PAGAMENTO[robo.padrao]
+                    self.saldo += ganho
+                    robo.ciclo["lucro"] += ganho
+                    robo.vitorias += 1
+                    self._registrar(horario, numero, robo, aposta, ganho, "Ganhou", nivel)
+                    robo.ciclo = None
                 else:
-                    self.ciclo["nivel"] = proximo
+                    self.saldo -= aposta
+                    robo.ciclo["lucro"] -= aposta
+                    proximo = nivel + 1
+                    if proximo >= len(robo.fichas):
+                        robo.estouros += 1
+                        self._registrar(horario, numero, robo, aposta, -aposta, "Perdeu — estourou", nivel)
+                        robo.ciclo, robo.aguardar_saida = None, True
+                    elif self.limite_max is not None and robo.fichas[proximo] > self.limite_max:
+                        robo.estouros += 1
+                        self._registrar(horario, numero, robo, aposta, -aposta, "Perdeu — limite da mesa", nivel)
+                        robo.ciclo, robo.aguardar_saida = None, True
+                    else:
+                        self._registrar(horario, numero, robo, aposta, -aposta, "Perdeu", nivel)
+                        robo.ciclo["nivel"] = proximo
+            if acertou:
+                robo.sem_sair, robo.aguardar_saida = 0, False
+            elif robo.sem_sair is not None:
+                robo.sem_sair += 1
+                robo.max_sem_sair = max(robo.max_sem_sair, robo.sem_sair)
 
-        if acertou:
-            self.sem_sair, self.aguardar_saida = 0, False
-        elif self.sem_sair is not None:
-            self.sem_sair += 1
-            self.max_sem_sair = max(self.max_sem_sair, self.sem_sair)
+        self._preparar_apostas(horario)
 
-        self._talvez_entrar(horario)
+    def _preparar_apostas(self, horario):
+        for robo in self.robos:
+            if robo.ciclo is None and not robo.aguardar_saida and robo.sem_sair == self.gatilho:
+                robo.ciclo = {"inicio": horario, "nivel": 0, "lucro": 0.0}
+                robo.entradas += 1
+        total = sum(r.aposta_atual for r in self.robos)
+        if total > self.saldo + 1e-9:
+            self.quebrou = True
+            for robo in self.robos:
+                robo.ciclo = None
 
-    def _talvez_entrar(self, horario):
-        if self.ciclo is None and not self.aguardar_saida and self.sem_sair == self.gatilho:
-            self.ciclo = {"inicio": horario, "nivel": 0, "lucro": 0.0, "maior_aposta": 0.0}
-        if self.ciclo is not None and self.fichas[self.ciclo["nivel"]] > self.saldo + 1e-9:
-            self.ciclos.append({**self.ciclo, "fim": horario, "resultado": "Banca insuficiente"})
-            self.ciclo, self.quebrou = None, True
+    def _registrar(self, horario, numero, robo, aposta, resultado, texto, nivel=None):
+        self.historico.append({
+            "horario": horario, "numero": numero, "categoria": robo.categoria, "aposta": aposta,
+            "nivel": nivel, "resultado": texto, "lucro": round(resultado, 2), "caixa": round(self.saldo, 2),
+        })
 
-    @property
-    def status(self):
+    # ---------------------------------------------------------------- situação
+    def status(self, robo):
         if self.quebrou:
-            return "Banca insuficiente para a próxima aposta — simulação parada"
-        if self.ciclo is not None:
-            nivel = self.ciclo["nivel"]
-            return (f"Apostando {self.fichas[nivel]:.2f} em {self.categoria} "
-                    + ("(entrada)" if nivel == 0 else f"(recuperação {nivel})"))
-        if self.sem_sair is None:
-            return f"Aguardando {self.categoria} sair para começar a contar"
-        if self.aguardar_saida:
-            return f"Ciclo estourado — aguardando {self.categoria} sair de novo"
-        falta = self.gatilho - self.sem_sair
-        return f"{self.categoria} está há {self.sem_sair} sem sair — faltam {falta} para entrar"
+            return "banca insuficiente — parado"
+        if robo.ciclo is not None:
+            nivel = robo.ciclo["nivel"]
+            return f"apostando {robo.aposta_atual:.2f}".replace(".", ",") + (" (entrada)" if nivel == 0 else f" (recuperação {nivel})")
+        if robo.sem_sair is None:
+            return "aguardando sair para começar a contar"
+        if robo.aguardar_saida:
+            return "estourou — aguardando sair de novo"
+        return f"{robo.sem_sair} sem sair — faltam {self.gatilho - robo.sem_sair} para entrar"
 
     @property
     def resumo(self):
-        resultados = [c["resultado"] for c in self.ciclos]
         return {
-            "entradas": len(self.ciclos) + (1 if self.ciclo and self.ciclo["maior_aposta"] > 0 else 0),
-            "vitorias": resultados.count("Ganhou"),
-            "estouros": resultados.count("Estourou") + resultados.count("Limite da mesa"),
+            "entradas": sum(r.entradas for r in self.robos),
+            "vitorias": sum(r.vitorias for r in self.robos),
+            "estouros": sum(r.estouros for r in self.robos),
         }

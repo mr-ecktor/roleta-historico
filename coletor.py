@@ -160,7 +160,10 @@ def coletar_pragmatic():
 
 
 def buscar_ao_vivo(nome):
-    """Últimos giros de uma mesa direto da fonte (para o simulador ao vivo): [(horario_utc, numero)]."""
+    """
+    Últimos giros de uma mesa direto da fonte (para o simulador ao vivo): [(horario_utc, numero, id)].
+    O id identifica o giro com segurança: a Pragmatic às vezes corrige o horário de um giro já publicado.
+    """
     for mesa, n in MESAS_EVOLUTION.items():
         if n == nome:
             rodadas = coletar_evolution(mesa, nome, tamanho=40)
@@ -173,7 +176,7 @@ def buscar_ao_vivo(nome):
         else:
             rodadas = coletar_pragmatic()[0].get(nome, [])
     return sorted(
-        (datetime.fromisoformat(r["finalizado_utc"].replace("Z", "+00:00")), int(r["numero"])) for r in rodadas
+        (datetime.fromisoformat(r["finalizado_utc"].replace("Z", "+00:00")), int(r["numero"]), r["id"]) for r in rodadas
     )
 
 
