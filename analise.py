@@ -25,6 +25,8 @@ NOMES_ANTIGOS = {"Auto Roulette": "Auto Roulette (Evolution)"}
 LIMITES_MANUAIS = {
     "Immersive Roulette": {"min": 2.5, "max": 25000, "moeda": "BRL"},
     "Auto Roulette (Evolution)": {"min": 0.5, "max": 25000, "moeda": "BRL"},
+    "Auto-Roulette VIP": {"min": 0.5, "max": 25000, "moeda": "BRL"},
+    "Roleta Ao Vivo": {"min": 0.5, "max": 25000, "moeda": "BRL"},
 }
 
 PASTA_DADOS = Path(__file__).parent / "dados"
