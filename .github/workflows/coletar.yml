@@ -3,7 +3,8 @@ name: Coletar roletas
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    # Minutos "quebrados" (7 e 37): o GitHub costuma descartar agendamentos nos minutos 0 e 30, os mais disputados
+    - cron: "7,37 * * * *"
   workflow_dispatch: {}   # permite rodar manualmente pelo botão "Run workflow"
 
 permissions:

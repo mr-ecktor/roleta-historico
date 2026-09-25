@@ -2,77 +2,150 @@
 Site de análise das roletas. Para rodar no PC:  python -m streamlit run app.py
 """
 
+import base64
 import hashlib
 import hmac
 from html import escape
+from pathlib import Path
 
 import streamlit as st
 
 from analise import FUSO_BRASILIA, PADROES, PERIODOS, analisar, carregar_giros, filtrar_periodo
 
-st.set_page_config(page_title="Histórico de Roletas", page_icon="🎡", layout="wide")
+ASSETS = Path(__file__).parent / "assets"
+
+st.set_page_config(page_title="Guardian · Análise de Roletas", page_icon=str(ASSETS / "icone.png"), layout="wide")
+
+
+def imagem_base64(nome):
+    return base64.b64encode((ASSETS / nome).read_bytes()).decode()
+
+
+LOGO = imagem_base64("logo.png")
+SIMBOLO = imagem_base64("simbolo.png")
 
 # ---------------------------------------------------------------- visual
+# Cor do marcador de cada categoria (vermelho/preto mantêm a cor da mesa)
 CORES_CATEGORIA = {
-    "Vermelho": "#e0393e",
-    "Preto": "#9aa3a0",
-    "Par": "#4f9dde",
-    "Ímpar": "#b57be0",
-    "Baixo (1-18)": "#3fbf8f",
-    "Alto (19-36)": "#f08a3c",
+    "Vermelho": "#ef3b3b",
+    "Preto": "#a1a1aa",
 }
-CORES_TRIO = ["#d4af37", "#3fbf8f", "#4f9dde"]  # dúzias e colunas
+LARANJAS = ["#ff9a3c", "#ff6a00", "#ff3d00"]
 
-st.markdown(
-    """
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+CSS = """
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
-html, body, [class*="st-"], .stMarkdown, .stSelectbox, .stTextInput, button {
+:root {
+    --laranja: #ff6a00;
+    --degrade: linear-gradient(135deg, #ffb347 0%, #ff6a00 55%, #ff3d00 100%);
+    --fundo-card: rgba(22, 22, 26, .78);
+    --borda: #26262c;
+    --texto-2: #a1a1aa;
+}
+html, body, .stApp, p, li, label, input, button, div[data-baseweb="select"] {
     font-family: 'Inter', system-ui, sans-serif;
 }
-h1, h2, h3, .titulo, .card-titulo { font-family: 'Outfit', 'Inter', sans-serif !important; }
+[data-testid="stIconMaterial"] { font-family: 'Material Symbols Rounded' !important; }
+.stApp {
+    background:
+        radial-gradient(ellipse 60% 45% at 85% -5%, rgba(255, 106, 0, .22), transparent 70%),
+        radial-gradient(ellipse 40% 35% at 0% 100%, rgba(255, 61, 0, .10), transparent 70%),
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 44px 44px,
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 44px 44px,
+        #09090b;
+}
 #MainMenu, footer, header [data-testid="stToolbar"] { visibility: hidden; }
-.block-container { padding-top: 2rem; max-width: 1200px; }
+header[data-testid="stHeader"] { background: transparent; }
+.block-container { padding-top: 1.6rem; max-width: 1200px; }
 
-.titulo { font-size: 2.1rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-.titulo span { color: #d4af37; }
-.subtitulo { color: #93a39a; margin: .2rem 0 1.4rem; font-size: .95rem; }
+/* Rótulos e campos */
+.stSelectbox label p, .stTextInput label p {
+    font-family: 'Sora', sans-serif; font-size: .72rem !important; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--texto-2);
+}
+div[data-baseweb="select"] > div, .stTextInput input {
+    background: rgba(22, 22, 26, .9) !important; border-radius: 10px !important;
+    border-color: var(--borda) !important;
+}
+div[data-baseweb="select"] > div:hover { border-color: var(--laranja) !important; }
 
+/* Botões */
+.stButton button, .stFormSubmitButton button {
+    border-radius: 999px; font-family: 'Sora', sans-serif; font-weight: 600; letter-spacing: .02em;
+}
+.stFormSubmitButton button[kind="primaryFormSubmit"] {
+    background: var(--degrade); border: none; color: #0b0b0d;
+    box-shadow: 0 8px 28px -8px rgba(255, 106, 0, .7);
+}
+.stButton button[kind="secondary"] { background: transparent; border: 1px solid var(--borda); }
+.stButton button[kind="secondary"]:hover { border-color: var(--laranja); color: var(--laranja); }
+
+/* Cabeçalho */
+.cabecalho { display: flex; align-items: center; gap: 1rem; }
+.cabecalho img { height: 64px; filter: drop-shadow(0 0 18px rgba(255, 106, 0, .45)); }
+.marca {
+    font-family: 'Sora', sans-serif; font-size: .78rem; font-weight: 700; letter-spacing: .32em;
+    text-transform: uppercase; background: var(--degrade); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.titulo {
+    font-family: 'Sora', sans-serif; font-size: clamp(1.5rem, 3.2vw, 2.3rem); font-weight: 800;
+    text-transform: uppercase; letter-spacing: -.01em; line-height: 1.05; margin: .15rem 0 0; color: #fafafa;
+}
+.subtitulo { color: var(--texto-2); margin: .8rem 0 1.4rem; font-size: .95rem; }
+
+/* Resumo */
 .resumo {
-    display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; align-items: center;
-    background: #17221d; border: 1px solid #243229; border-radius: 12px;
-    padding: .8rem 1.1rem; margin: .6rem 0 1.4rem; font-size: .92rem; color: #b9c6be;
+    display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; align-items: center;
+    background: var(--fundo-card); border: 1px solid var(--borda); border-left: 3px solid var(--laranja);
+    border-radius: 12px; padding: .8rem 1.1rem; margin: .6rem 0 1.4rem; font-size: .9rem; color: var(--texto-2);
+    backdrop-filter: blur(8px);
 }
-.resumo b { color: #e9efe9; font-weight: 600; }
-.resumo .alerta { color: #f0b43c; }
+.resumo b { color: #fafafa; font-weight: 600; }
+.resumo .alerta { color: #fbbf24; }
 
+/* Cartões */
 .card {
-    background: #17221d; border: 1px solid #243229; border-radius: 14px;
-    overflow: hidden; margin-bottom: 1rem;
+    position: relative; background: var(--fundo-card); border: 1px solid var(--borda); border-radius: 16px;
+    overflow: hidden; margin-bottom: 1rem; backdrop-filter: blur(8px); transition: border-color .2s, box-shadow .2s;
 }
+.card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--degrade); }
+.card:hover { border-color: rgba(255, 106, 0, .55); box-shadow: 0 0 0 1px rgba(255, 106, 0, .15), 0 18px 40px -18px rgba(255, 106, 0, .45); }
 .card-titulo {
-    font-size: 1.15rem; font-weight: 600; padding: .85rem 1.1rem;
-    border-bottom: 1px solid #243229; display: flex; align-items: center; gap: .6rem;
+    font-family: 'Sora', sans-serif; font-size: 1.05rem; font-weight: 700; letter-spacing: .02em;
+    padding: 1rem 1.2rem .8rem; display: flex; align-items: center; gap: .65rem; color: #fafafa;
 }
-.card-titulo .ponto { width: .8rem; height: .8rem; border-radius: 50%; display: inline-block; }
-.card table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.card-titulo .ponto { width: .7rem; height: .7rem; border-radius: 50%; display: inline-block; box-shadow: 0 0 12px currentColor; }
+.card table { width: 100%; border-collapse: collapse; font-size: .93rem; }
 .card th {
-    text-align: left; font-weight: 500; color: #93a39a; font-size: .78rem;
-    text-transform: uppercase; letter-spacing: .06em; padding: .6rem 1.1rem .4rem;
+    text-align: left; font-family: 'Sora', sans-serif; font-weight: 600; color: #71717a; font-size: .68rem;
+    text-transform: uppercase; letter-spacing: .16em; padding: .3rem 1.2rem .5rem;
 }
-.card td { padding: .45rem 1.1rem; border-top: 1px solid #1f2c25; }
-.card tr:hover td { background: #1c2a23; }
-.vezes { width: 42%; }
-.vezes .num { font-weight: 600; font-variant-numeric: tabular-nums; display: inline-block; min-width: 4.2rem; }
-.barra { height: 6px; border-radius: 3px; display: inline-block; vertical-align: middle; opacity: .85; }
-.rodadas { color: #d5ddd8; }
-.vazio { padding: 1rem 1.1rem; color: #93a39a; font-size: .9rem; }
+.card td { padding: .5rem 1.2rem; border-top: 1px solid #1f1f24; white-space: nowrap; }
+.card th { white-space: nowrap; }
+.card.compacto td, .card.compacto th { padding-left: .85rem; padding-right: .85rem; }
+.card.compacto table { font-size: .88rem; }
+.card tr:hover td { background: rgba(255, 106, 0, .06); }
+.vezes { width: 46%; white-space: nowrap; }
+.vezes .num { font-weight: 600; font-variant-numeric: tabular-nums; display: inline-block; min-width: 4.6rem; color: #fafafa; }
+.barra { height: 6px; border-radius: 3px; display: inline-block; vertical-align: middle; background: var(--degrade); box-shadow: 0 0 10px rgba(255, 106, 0, .5); }
+.rodadas { color: #d4d4d8; }
+.vazio { padding: .4rem 1.2rem 1.2rem; color: var(--texto-2); font-size: .9rem; }
 
-.login-box { max-width: 380px; margin: 8vh auto 0; }
+/* Login */
+.login-logo { text-align: center; margin: 5vh 0 1.2rem; }
+.login-logo img { width: min(220px, 60%); filter: drop-shadow(0 0 28px rgba(255, 106, 0, .45)); }
+.login-texto { text-align: center; color: var(--texto-2); font-size: .92rem; margin-bottom: 1rem; }
+[data-testid="stForm"] {
+    background: var(--fundo-card); border: 1px solid var(--borda); border-radius: 16px; padding: 1.4rem;
+    backdrop-filter: blur(8px);
+}
+
+/* Expansor */
+[data-testid="stExpander"] details { background: var(--fundo-card); border: 1px solid var(--borda); border-radius: 12px; }
 </style>
-""",
-    unsafe_allow_html=True,
-)
+"""
+# Linhas em branco encerram o bloco HTML no Markdown e fariam o CSS aparecer como texto
+st.markdown("\n".join(linha for linha in CSS.splitlines() if linha.strip()), unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------- login
@@ -83,10 +156,13 @@ def senha_confere(usuario, senha):
 
 
 if not st.session_state.get("logado"):
-    _, meio, _ = st.columns([1, 1.3, 1])
+    _, meio, _ = st.columns([1, 1.2, 1])
     with meio:
-        st.markdown('<div style="height:8vh"></div><p class="titulo">🎡 Histórico de <span>Roletas</span></p>'
-                    '<p class="subtitulo">Entre para acessar as análises</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="login-logo"><img src="data:image/png;base64,{LOGO}" alt="Guardian"></div>'
+            '<p class="login-texto">Análise inteligente de roletas ao vivo</p>',
+            unsafe_allow_html=True,
+        )
         with st.form("login"):
             usuario = st.text_input("Usuário")
             senha = st.text_input("Senha", type="password")
@@ -108,12 +184,15 @@ def dados():
 por_mesa = dados()
 
 topo, sair = st.columns([6, 1], vertical_alignment="center")
-topo.markdown('<p class="titulo">🎡 Histórico de <span>Roletas</span></p>'
-              '<p class="subtitulo">Quantas vezes cada padrão ficou X rodadas seguidas sem sair</p>',
-              unsafe_allow_html=True)
+topo.markdown(
+    f'<div class="cabecalho"><img src="data:image/png;base64,{SIMBOLO}" alt="">'
+    '<div><div class="marca">Guardian</div><p class="titulo">Análise de Roletas</p></div></div>',
+    unsafe_allow_html=True,
+)
 if sair.button("Sair", use_container_width=True):
     st.session_state.logado = False
     st.rerun()
+st.markdown('<p class="subtitulo">Quantas vezes cada padrão ficou X rodadas seguidas sem sair.</p>', unsafe_allow_html=True)
 
 c1, c2, c3 = st.columns(3)
 mesa = c1.selectbox("Roleta", sorted(por_mesa))
@@ -138,28 +217,30 @@ if len(tamanhos) > 1:
 st.markdown(f'<div class="resumo">{"".join(partes)}</div>', unsafe_allow_html=True)
 
 
-def cartao(nome, cor, contagem):
-    cabecalho = f'<div class="card-titulo"><span class="ponto" style="background:{cor}"></span>{escape(nome)}</div>'
+def cartao(nome, cor, contagem, compacto=False):
+    classe = "card compacto" if compacto else "card"
+    cabecalho = f'<div class="card-titulo"><span class="ponto" style="background:{cor};color:{cor}"></span>{escape(nome)}</div>'
     if not contagem:
-        return f'<div class="card">{cabecalho}<div class="vazio">Nenhuma ausência completa nesse período.</div></div>'
+        return f'<div class="{classe}">{cabecalho}<div class="vazio">Nenhuma ausência completa nesse período.</div></div>'
     maior_vezes = max(contagem.values())
+    barra_max = 44 if compacto else 70
     linhas = []
     for rodadas in sorted(contagem):
         vezes = contagem[rodadas]
-        largura = max(4, round(70 * vezes / maior_vezes))
+        largura = max(4, round(barra_max * vezes / maior_vezes))
         linhas.append(
             f'<tr><td class="vezes"><span class="num">{vezes} {"vez" if vezes == 1 else "vezes"}</span>'
-            f'<span class="barra" style="width:{largura}px;background:{cor}"></span></td>'
+            f'<span class="barra" style="width:{largura}px"></span></td>'
             f'<td class="rodadas">{rodadas} rodada{"s" if rodadas > 1 else ""} sem sair</td></tr>'
         )
-    return (f'<div class="card">{cabecalho}<table><tr><th>Vezes</th><th>Rodadas sem sair</th></tr>'
+    return (f'<div class="{classe}">{cabecalho}<table><tr><th>Vezes</th><th>Rodadas sem sair</th></tr>'
             f'{"".join(linhas)}</table></div>')
 
 
 colunas = st.columns(len(resultado))
 for i, (coluna, (nome, r)) in enumerate(zip(colunas, resultado.items())):
-    cor = CORES_CATEGORIA.get(nome, CORES_TRIO[i % 3])
-    coluna.markdown(cartao(nome, cor, r["contagem"]), unsafe_allow_html=True)
+    cor = CORES_CATEGORIA.get(nome, LARANJAS[i % 3])
+    coluna.markdown(cartao(nome, cor, r["contagem"], compacto=len(resultado) > 2), unsafe_allow_html=True)
 
 with st.expander("Como ler esta análise"):
     st.markdown(
