@@ -5,6 +5,7 @@ Site de análise das roletas. Para rodar no PC:  python -m streamlit run app.py
 import base64
 import hashlib
 import hmac
+from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
 
@@ -198,6 +199,18 @@ if sair.button("Sair", use_container_width=True):
     st.session_state.logado = False
     st.rerun()
 st.markdown('<p class="subtitulo">Quantas vezes cada padrão ficou X rodadas seguidas sem sair.</p>', unsafe_allow_html=True)
+
+# Alerta de dados atrasados (coleta normal: a cada 30 min)
+ultimo_giro = max(g[-1][0] for g in por_mesa.values())
+atraso = datetime.now(timezone.utc) - ultimo_giro
+if atraso > timedelta(minutes=75):
+    horas = atraso.total_seconds() / 3600
+    st.markdown(
+        f'<div class="resumo" style="border-left-color:#fbbf24"><span class="alerta">⚠ Coleta atrasada: '
+        f'o último giro registrado foi há {horas:.1f} h ({ultimo_giro.astimezone(FUSO_BRASILIA):%d/%m %H:%M}). '
+        'Verifique o cron-job.org e a aba Actions do GitHub.</span></div>',
+        unsafe_allow_html=True,
+    )
 
 c1, c2, c3 = st.columns(3)
 mesa = c1.selectbox("Roleta", sorted(por_mesa))

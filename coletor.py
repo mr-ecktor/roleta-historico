@@ -8,6 +8,7 @@ Rodadas já gravadas são ignoradas (pelo ID único de cada rodada).
 
 import csv
 import json
+import sys
 import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -31,6 +32,7 @@ URL_API = (
 
 PASTA_DADOS = Path(__file__).parent / "dados"
 FUSO_BRASILIA = timezone(timedelta(hours=-3))  # Brasil não tem horário de verão desde 2019
+LIMITE_SEM_GIROS = timedelta(hours=2)  # mesa sem giros novos por mais tempo que isso gera alerta
 
 COLUNAS = [
     "id", "mesa", "numero", "cor", "paridade",
@@ -79,11 +81,14 @@ def ids_existentes(arquivo):
 
 def main():
     novas = []
+    problemas = []
+    agora = datetime.now(timezone.utc)
     for mesa, nome in MESAS.items():
         try:
             itens = buscar_rodadas(mesa)
         except Exception as erro:
             print(f"[ERRO] {nome}: {erro}")
+            problemas.append(f"{nome}: erro ao consultar o site de origem ({erro})")
             continue
         rodadas, ignoradas = [], 0
         for i in itens:
@@ -95,6 +100,13 @@ def main():
                 pass
             ignoradas += 1
         print(f"{nome}: {len(rodadas)} rodadas recebidas" + (f" ({ignoradas} ignoradas)" if ignoradas else ""))
+        if rodadas:
+            ultima = max(datetime.fromisoformat(r["finalizado_utc"].replace("Z", "+00:00")) for r in rodadas)
+            if agora - ultima > LIMITE_SEM_GIROS:
+                horas = (agora - ultima).total_seconds() / 3600
+                problemas.append(f"{nome}: sem giros novos há {horas:.1f} horas")
+        else:
+            problemas.append(f"{nome}: nenhuma rodada recebida")
         novas.extend(rodadas)
         time.sleep(1)  # pausa curta para não sobrecarregar o site
 
@@ -121,6 +133,13 @@ def main():
         print(f"  -> {arquivo.name}: +{len(inedita)} rodadas")
 
     print(f"Total de rodadas novas gravadas: {total_gravadas}")
+
+    # Qualquer problema faz a execução "falhar" no GitHub, que então envia um e-mail de alerta.
+    # Os dados coletados das outras mesas são salvos mesmo assim.
+    if problemas:
+        for p in problemas:
+            print(f"::error::{p}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
