@@ -219,7 +219,7 @@ if sair.button("Sair", key="sair"):
     st.session_state.logado = False
     st.rerun()
 if modo == "Simulador":
-    st.markdown('<p class="subtitulo">Teste uma estratégia com recuperação nos giros reais coletados — sem apostar dinheiro.</p>',
+    st.markdown('<p class="subtitulo">Simulação ao vivo: acompanha a mesa em tempo real a partir do Start — sem apostar dinheiro.</p>',
                 unsafe_allow_html=True)
 
 # Alerta de dados atrasados (coleta normal: a cada 5 min)

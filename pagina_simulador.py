@@ -1,19 +1,21 @@
-"""Tela do Simulador (botão "Simulador" do site)."""
+"""
+Tela do Simulador ao vivo (botão "Simulador" do site).
 
+Depois do Start, acompanha os giros reais da mesa escolhida (consulta a fonte a cada ~10 s)
+e simula as apostas com a tabela de recuperação do usuário. Nenhuma aposta real é feita.
+O estado fica na sessão do navegador: fechar a aba encerra a simulação.
+"""
+
+from datetime import datetime, timezone
 from html import escape
 
-import altair as alt
-import pandas as pd
 import streamlit as st
 
-from analise import FUSO_BRASILIA, PADROES, PERIODOS, filtrar_periodo, formatar_limite
-from simulador import (PAGAMENTO, VANTAGEM_DA_CASA, niveis_tabela, sequencia_da_tabela,
-                       sequencia_de_fichas, simular)
+from analise import FUSO_BRASILIA, PADROES, formatar_limite
+from coletor import buscar_ao_vivo
+from simulador import PAGAMENTO, SimulacaoAoVivo, niveis_tabela, sequencia_da_tabela
 
-COR_LINHA = "#f25c00"  # laranja da marca ajustado para a faixa de luminosidade do modo escuro (validado)
-COR_REFERENCIA = "#71717a"
-# Rótulo do eixo em reais no formato brasileiro (1.234,50)
-EIXO_REAIS = "'R$ ' + replace(replace(replace(format(datum.value, ',.2f'), ',', '#'), '.', ','), '#', '.')"
+ATUALIZAR_A_CADA_S = 10
 
 
 def reais(v, sinal=False):
@@ -25,7 +27,7 @@ def reais(v, sinal=False):
 
 CSS = """
 <style>
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .8rem; margin: .4rem 0 1.2rem; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .8rem; margin: .6rem 0 1.2rem; }
 .tile { background: var(--fundo-card); border: 1px solid var(--borda); border-radius: 14px; padding: .9rem 1.1rem; }
 .tile .rotulo { font-family: 'Sora', sans-serif; font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #71717a; }
 .tile .valor { font-family: 'Sora', sans-serif; font-size: 1.45rem; font-weight: 700; color: #fafafa; margin-top: .25rem; font-variant-numeric: tabular-nums; }
@@ -34,87 +36,59 @@ CSS = """
 .stNumberInput label p { font-family: 'Sora', sans-serif; font-size: .72rem !important; font-weight: 600;
     letter-spacing: .14em; text-transform: uppercase; color: var(--texto-2); }
 .stNumberInput input { background: rgba(22, 22, 26, .9) !important; }
-.fichas { font-size: .9rem; color: var(--texto-2); margin: -.2rem 0 1rem; }
+.fichas { font-size: .95rem; color: var(--texto-2); margin: .2rem 0 .8rem; }
 .fichas b { color: #fafafa; font-variant-numeric: tabular-nums; }
-.nota { background: var(--fundo-card); border: 1px solid var(--borda); border-left: 3px solid #71717a;
-        border-radius: 12px; padding: .8rem 1.1rem; font-size: .88rem; color: var(--texto-2); margin: 1rem 0; }
-.nota b { color: #fafafa; }
+.painel { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1.6rem; background: var(--fundo-card);
+          border: 1px solid var(--borda); border-left: 3px solid var(--laranja); border-radius: 14px; padding: 1rem 1.2rem; margin-top: .4rem; }
+.cronometro { font-family: 'Sora', sans-serif; font-size: 2.2rem; font-weight: 800; color: #fafafa; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.estado { font-size: .95rem; color: #d4d4d8; }
+.estado small { display: block; color: var(--texto-2); font-size: .8rem; margin-top: .2rem; }
+.ponto-vivo { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; background: #22c55e; margin-right: .45rem;
+              box-shadow: 0 0 10px #22c55e; animation: pulsa 1.4s infinite; }
+.ponto-parado { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; background: #71717a; margin-right: .45rem; }
+@keyframes pulsa { 50% { opacity: .35; } }
+.st-key-sim_start button { background: var(--degrade); border: none; color: #0b0b0d; font-family: 'Sora', sans-serif; font-weight: 700;
+                           box-shadow: 0 8px 28px -8px rgba(255, 106, 0, .7); }
 </style>
 """
 
 
-def grafico_saldo(evolucao, banca):
-    df = pd.DataFrame(
-        [(t.astimezone(FUSO_BRASILIA).replace(tzinfo=None), s) for t, s in evolucao],
-        columns=["Horário", "Saldo"],
-    )
-    base = alt.Chart(df).encode(
-        x=alt.X("Horário:T", title=None, axis=alt.Axis(format="%d/%m %H:%M", labelColor="#a1a1aa", grid=False,
-                                                        domainColor="#3f3f46", tickColor="#3f3f46")),
-    )
-    linha = base.mark_line(color=COR_LINHA, strokeWidth=2, interpolate="step-after").encode(
-        y=alt.Y("Saldo:Q", title=None, scale=alt.Scale(zero=False),
-                axis=alt.Axis(labelColor="#a1a1aa", gridColor="#26262c", domain=False, ticks=False,
-                              labelExpr=EIXO_REAIS)),
-    )
-    referencia = alt.Chart(pd.DataFrame({"Saldo": [banca]})).mark_rule(
-        color=COR_REFERENCIA, strokeDash=[4, 4], strokeWidth=1,
-    ).encode(y="Saldo:Q")
-    # crosshair + dica ao passar o mouse
-    perto = alt.selection_point(nearest=True, on="pointerover", fields=["Horário"], empty=False)
-    alvo = base.mark_point(opacity=0, size=400).encode(y="Saldo:Q").add_params(perto)
-    ponto = base.mark_point(color=COR_LINHA, filled=True, size=70, stroke="#09090b", strokeWidth=2).encode(
-        y="Saldo:Q",
-        opacity=alt.condition(perto, alt.value(1), alt.value(0)),
-        tooltip=[alt.Tooltip("Horário:T", format="%d/%m %H:%M:%S"), alt.Tooltip("Saldo:Q", format=",.2f", title="Saldo (R$)")],
-    )
-    regua = base.mark_rule(color="#52525b", strokeWidth=1).encode(
-        opacity=alt.condition(perto, alt.value(1), alt.value(0)),
-    )
-    return (
-        alt.layer(referencia, linha, regua, alvo, ponto)
-        .properties(height=320, background="transparent")
-        .configure_view(stroke=None)
-    )
+@st.cache_data(ttl=ATUALIZAR_A_CADA_S - 2, show_spinner=False)
+def giros_recentes(mesa):
+    return buscar_ao_vivo(mesa)
+
+
+def cronometro(segundos):
+    s = int(segundos)
+    return f"{s // 3600:02d}:{s % 3600 // 60:02d}:{s % 60:02d}"
 
 
 def pagina_simulador(por_mesa, limites):
     st.markdown(CSS, unsafe_allow_html=True)
+    sessao = st.session_state.get("ao_vivo")
+    rodando = bool(sessao and sessao["rodando"])
 
-    c1, c2, c3, c4 = st.columns(4)
-    mesa = c1.selectbox("Roleta", sorted(por_mesa), key="sim_mesa")
-    padrao = c2.selectbox("Padrão", list(PADROES), key="sim_padrao")
-    categoria = c3.selectbox("Apostar em", list(PADROES[padrao]), key=f"sim_cat_{padrao}")
-    periodo = c4.selectbox("Período", list(PERIODOS), index=1, key="sim_periodo")
+    c1, c2, c3 = st.columns(3)
+    mesa = c1.selectbox("Roleta", sorted(por_mesa), key="sim_mesa", disabled=rodando)
+    padrao = c2.selectbox("Padrão", list(PADROES), key="sim_padrao", disabled=rodando)
+    categoria = c3.selectbox("Apostar em", list(PADROES[padrao]), key=f"sim_cat_{padrao}", disabled=rodando)
 
     limite = limites.get(mesa)
-    tres_opcoes = len(PADROES[padrao]) == 3
-    d1, d2, d3, d4, d5, d6 = st.columns(6)
-    gatilho = d1.number_input("Gatilho", help="Entra quando a categoria completar esse número de rodadas seguidas sem sair", min_value=0, max_value=50, value=5, step=1, key="sim_gatilho")
-    ficha = d2.number_input("Ficha inicial (R$)", min_value=0.10, max_value=10000.0,
+    max_niveis = niveis_tabela(padrao) - 1
+    d1, d2, d3, d4 = st.columns(4)
+    gatilho = d1.number_input("Gatilho", min_value=0, max_value=50, value=5, step=1, key="sim_gatilho", disabled=rodando,
+                              help="Entra quando a categoria completar esse número de rodadas seguidas sem sair")
+    ficha = d2.number_input("Ficha inicial (R$)", min_value=0.10, max_value=10000.0, disabled=rodando,
                             value=float(limite["min"]) if limite else 0.50, step=0.50, format="%.2f", key=f"sim_ficha_{mesa}")
-    tipo = d3.selectbox("Recuperação", ["Minha tabela", "Multiplicador"], key="sim_tipo")
-    usa_tabela = tipo == "Minha tabela"
-    multiplicador = d4.number_input("Multiplicador", min_value=1.0, max_value=5.0, disabled=usa_tabela,
-                                    value=1.5 if tres_opcoes else 2.0, step=0.1, format="%.1f", key=f"sim_mult_{padrao}")
-    max_permitido = niveis_tabela(padrao) - 1 if usa_tabela else 15
-    max_rec = d5.number_input("Máx. recuperações", min_value=0, max_value=max_permitido,
-                              value=min(3, max_permitido), step=1, key=f"sim_rec_{padrao}_{tipo}")
-    banca = d6.number_input("Banca inicial (R$)", min_value=1.0, max_value=1_000_000.0, value=100.0, step=10.0,
-                            format="%.2f", key="sim_banca")
+    max_rec = d3.number_input("Máx. recuperações", min_value=0, max_value=max_niveis, value=min(3, max_niveis), step=1,
+                              key=f"sim_rec_{padrao}", disabled=rodando,
+                              help="Até qual nível da sua tabela de recuperação o robô vai")
+    banca = d4.number_input("Banca inicial (R$)", min_value=1.0, max_value=1_000_000.0, value=100.0, step=10.0,
+                            format="%.2f", key="sim_banca", disabled=rodando)
 
-    if usa_tabela:
-        fichas = sequencia_da_tabela(padrao, ficha, int(max_rec))
-    else:
-        fichas = sequencia_de_fichas(ficha, multiplicador, int(max_rec))
+    fichas = sequencia_da_tabela(padrao, ficha, int(max_rec))
     risco = sum(fichas)
-    mostrar = fichas if len(fichas) <= 8 else fichas[:6] + [None] + fichas[-1:]
-    st.markdown(
-        '<p class="fichas">Fichas do ciclo: <b>' + " → ".join("…" if f is None else reais(f) for f in mostrar) + "</b>"
-        f" · em risco por ciclo: <b>{reais(risco)}</b>"
-        f" · ganho se acertar na 1ª: <b>{reais(fichas[0] * PAGAMENTO[padrao])}</b></p>",
-        unsafe_allow_html=True,
-    )
+    st.markdown(f'<p class="fichas">Valor em risco por ciclo: <b>{reais(risco)}</b></p>', unsafe_allow_html=True)
     with st.expander("Ver todos os níveis do ciclo"):
         investido, linhas = 0.0, []
         for nivel, aposta in enumerate(fichas, start=1):
@@ -125,6 +99,7 @@ def pagina_simulador(por_mesa, limites):
         st.markdown('<div class="card ranking"><div class="rolagem"><table><tr><th class="c">Nível</th>'
                     '<th class="c">Aposta</th><th class="c">Investido</th><th class="c">Ganho se acertar</th></tr>'
                     + "".join(linhas) + "</table></div></div>", unsafe_allow_html=True)
+
     if limite and ficha < limite["min"]:
         st.warning(f"A ficha inicial está abaixo do mínimo desta mesa ({formatar_limite(limite)}).")
     if limite and fichas[-1] > limite["max"]:
@@ -132,24 +107,82 @@ def pagina_simulador(por_mesa, limites):
     if risco > banca:
         st.warning(f"Um ciclo completo arrisca {reais(risco)}, mais que a banca inicial ({reais(banca)}).")
 
-    giros = filtrar_periodo(por_mesa[mesa], periodo)
-    if len(giros) < 2:
-        st.info("Poucas rodadas registradas nesse período para simular.")
+    b1, b2, _ = st.columns([1, 1, 4])
+    if not rodando:
+        if b1.button("▶ Start", key="sim_start", use_container_width=True):
+            try:
+                anteriores = giros_recentes(mesa)
+            except Exception as erro:
+                st.error(f"Não foi possível ler a mesa agora ({erro}). Tente de novo em alguns segundos.")
+                return
+            sim = SimulacaoAoVivo(padrao, categoria, int(gatilho), fichas, banca,
+                                  limite_max=limite["max"] if limite else None)
+            sim.aquecer(anteriores)
+            st.session_state.ao_vivo = {
+                "sim": sim, "mesa": mesa, "inicio": datetime.now(timezone.utc), "fim": None, "rodando": True,
+                "ultimo": anteriores[-1][0] if anteriores else None, "ultimo_giro": anteriores[-1] if anteriores else None,
+                "erro": None,
+            }
+            st.rerun()
+        if sessao and b2.button("Zerar", key="sim_zerar", use_container_width=True):
+            del st.session_state.ao_vivo
+            st.rerun()
+    elif b1.button("■ Parar", key="sim_parar", use_container_width=True):
+        sessao["rodando"] = False
+        sessao["fim"] = datetime.now(timezone.utc)
+        st.rerun()
+
+    if st.session_state.get("ao_vivo"):
+        painel_ao_vivo()
+    else:
+        st.info("Configure a estratégia e aperte **Start**. A simulação acompanha os giros reais da mesa a partir desse "
+                "momento, sem fazer apostas de verdade. Mantenha esta aba aberta enquanto ela roda.")
+
+
+@st.fragment(run_every=1)
+def painel_ao_vivo():
+    sessao = st.session_state.get("ao_vivo")
+    if not sessao:
         return
+    sim = sessao["sim"]
 
-    r = simular(giros, padrao, categoria, int(gatilho), fichas, banca,
-                limite_max=limite["max"] if limite else None)
+    if sessao["rodando"]:
+        try:
+            for horario, numero in giros_recentes(sessao["mesa"]):
+                if sessao["ultimo"] is None or horario > sessao["ultimo"]:
+                    sim.processar(horario, numero)
+                    sessao["ultimo"], sessao["ultimo_giro"] = horario, (horario, numero)
+            sessao["erro"] = None
+        except Exception as erro:
+            sessao["erro"] = str(erro)
+        if sim.quebrou:
+            sessao["rodando"], sessao["fim"] = False, datetime.now(timezone.utc)
 
-    rotulo_resultado = "Lucro" if r["lucro"] > 0 else "Prejuízo" if r["lucro"] < 0 else "Resultado"
-    taxa = f"{100 * r['vitorias'] / r['entradas']:.1f}% de acerto".replace(".", ",") if r["entradas"] else "nenhuma entrada"
-    estouros = f"{r['estouros']} estouro" + ("" if r["estouros"] == 1 else "s")
+    fim = sessao["fim"] or datetime.now(timezone.utc)
+    decorrido = (fim - sessao["inicio"]).total_seconds()
+    ponto = '<span class="ponto-vivo"></span>Jogando' if sessao["rodando"] else '<span class="ponto-parado"></span>Parado'
+    ultimo = sessao["ultimo_giro"]
+    detalhe = f"{escape(sessao['mesa'])} · {sim.giros_vistos} giros desde o Start"
+    if ultimo:
+        detalhe += f" · último: <b>{ultimo[1]}</b> às {ultimo[0].astimezone(FUSO_BRASILIA):%H:%M:%S}"
+    if sessao.get("erro"):
+        detalhe += " · ⚠ falha ao ler a mesa, tentando de novo"
+    st.markdown(
+        f'<div class="painel"><div class="cronometro">{cronometro(decorrido)}</div>'
+        f'<div class="estado">{ponto} — {escape(sim.status)}<small>{detalhe}</small></div></div>',
+        unsafe_allow_html=True,
+    )
+
+    r = sim.resumo
+    lucro = sim.saldo - sim.banca
     ganhas = f"{r['vitorias']} ganha" + ("" if r["vitorias"] == 1 else "s")
+    estouros = f"{r['estouros']} estouro" + ("" if r["estouros"] == 1 else "s")
     tiles = [
-        ("Saldo final", reais(r["saldo_final"]), "banca quebrou" if r["quebrou"] else f"banca inicial {reais(banca)}", True),
-        (rotulo_resultado, reais(r["lucro"], sinal=True), f"esperado pela matemática: {reais(r['esperado'], sinal=True)}", False),
-        ("Entradas", str(r["entradas"]), f"{ganhas} · {estouros} · {taxa}", False),
-        ("Maior queda", reais(-r["maior_queda"]) if r["maior_queda"] else reais(0), f"menor saldo: {reais(r['menor_saldo'])}", False),
-        ("Total apostado", reais(r["total_apostado"]), f"{len(giros):,} rodadas no período".replace(",", "."), False),
+        ("Saldo inicial", reais(sim.banca), "banca no Start", False),
+        ("Saldo final", reais(sim.saldo), f"{'lucro' if lucro > 0 else 'prejuízo' if lucro < 0 else 'resultado'}: "
+                                          f"{reais(lucro, sinal=True)}", True),
+        ("Entradas", str(r["entradas"]), f"{ganhas} · {estouros}", False),
+        ("Máx. sem sair", str(sim.max_sem_sair), f"maior sequência sem {sim.categoria} desde o Start", False),
     ]
     st.markdown(
         '<div class="tiles">' + "".join(
@@ -159,34 +192,3 @@ def pagina_simulador(por_mesa, limites):
         ) + "</div>",
         unsafe_allow_html=True,
     )
-
-    if len(r["evolucao"]) > 1:
-        st.markdown('<p class="secao">Saldo ao longo do tempo <span>· linha tracejada = banca inicial</span></p>',
-                    unsafe_allow_html=True)
-        st.altair_chart(grafico_saldo(r["evolucao"], banca), use_container_width=True)
-
-    st.markdown(
-        f'<div class="nota">Pela matemática, cada aposta perde em média <b>{f"{VANTAGEM_DA_CASA:.1%}".replace(".", ",")}</b> do valor apostado — '
-        f'para os <b>{reais(r["total_apostado"])}</b> apostados aqui, o esperado seria <b>{reais(r["esperado"], sinal=True)}</b>. '
-        'A recuperação não muda isso: troca muitos ganhos pequenos por perdas grandes ocasionais. '
-        'Um resultado positivo num período curto é sorte da amostra, não vantagem — teste em vários dias e mesas.</div>',
-        unsafe_allow_html=True,
-    )
-
-    if r["ciclos"]:
-        linhas = []
-        for c in reversed(r["ciclos"][-40:]):
-            gales = c["nivel"]
-            linhas.append(
-                f"<tr><td>{c['inicio'].astimezone(FUSO_BRASILIA):%d/%m %H:%M:%S}</td>"
-                f"<td class='c'>{gales}</td><td>{escape(c['resultado'])}</td>"
-                f"<td class='c'>{escape(reais(c['maior_aposta']))}</td>"
-                f"<td class='c'>{escape(reais(c['lucro'], sinal=True))}</td></tr>"
-            )
-        st.markdown(
-            '<p class="secao">Últimas entradas <span>· mais recentes primeiro</span></p>'
-            '<div class="card ranking"><div class="rolagem"><table><tr><th>Início</th><th class="c">Recuperações</th>'
-            '<th>Resultado</th><th class="c">Maior aposta</th><th class="c">Lucro do ciclo</th></tr>'
-            + "".join(linhas) + "</table></div></div>",
-            unsafe_allow_html=True,
-        )

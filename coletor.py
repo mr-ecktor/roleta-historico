@@ -46,9 +46,9 @@ MESAS_ATIVAS = list(MESAS_EVOLUTION.values()) + list(MESAS_TIPMINER.values()) + 
 
 URL_EVOLUTION = (
     "https://api.casinoscores.com/svc-evolution-game-events/api/{mesa}"
-    "?page=0&size=500&sort=data.settledAt,desc&duration=24"
+    "?page=0&size={tamanho}&sort=data.settledAt,desc&duration=24"
 )
-URL_TIPMINER = "https://api.core.public.tipminer.com/v1/roulette/rounds/{pid}/history?limit=200"
+URL_TIPMINER = "https://api.core.public.tipminer.com/v1/roulette/rounds/{pid}/history?limit={tamanho}"
 URL_PRAGMATIC = "wss://dga.pragmaticplaylive.net/ws"
 CASSINO_PRAGMATIC = "ppcdk00000005349"  # identificador público de lobby usado para leitura
 
@@ -79,8 +79,8 @@ def linha(id_, mesa, numero, finalizado, iniciado_utc="", sorte=""):
 
 
 # ---------------------------------------------------------------- Evolution
-def coletar_evolution(mesa, nome):
-    req = urllib.request.Request(URL_EVOLUTION.format(mesa=mesa), headers={"User-Agent": "Mozilla/5.0"})
+def coletar_evolution(mesa, nome, tamanho=500):
+    req = urllib.request.Request(URL_EVOLUTION.format(mesa=mesa, tamanho=tamanho), headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         itens = json.load(resp)
     rodadas = []
@@ -99,8 +99,8 @@ def coletar_evolution(mesa, nome):
 
 
 # ---------------------------------------------------------------- TipMiner (Evolution)
-def coletar_tipminer(pid, nome):
-    req = urllib.request.Request(URL_TIPMINER.format(pid=pid), headers={
+def coletar_tipminer(pid, nome, tamanho=200):
+    req = urllib.request.Request(URL_TIPMINER.format(pid=pid, tamanho=tamanho), headers={
         "User-Agent": "Mozilla/5.0", "Origin": "https://www.tipminer.com", "Referer": "https://www.tipminer.com/",
     })
     with urllib.request.urlopen(req, timeout=30) as resp:
@@ -157,6 +157,24 @@ def coletar_pragmatic():
         if lim.get("minBet") is not None and lim.get("maxBet") is not None:
             limites[nome] = {"min": lim["minBet"], "max": lim["maxBet"], "moeda": msg.get("currency", "BRL")}
     return rodadas, limites
+
+
+def buscar_ao_vivo(nome):
+    """Últimos giros de uma mesa direto da fonte (para o simulador ao vivo): [(horario_utc, numero)]."""
+    for mesa, n in MESAS_EVOLUTION.items():
+        if n == nome:
+            rodadas = coletar_evolution(mesa, nome, tamanho=40)
+            break
+    else:
+        for pid, n in MESAS_TIPMINER.items():
+            if n == nome:
+                rodadas = coletar_tipminer(pid, nome, tamanho=40)
+                break
+        else:
+            rodadas = coletar_pragmatic()[0].get(nome, [])
+    return sorted(
+        (datetime.fromisoformat(r["finalizado_utc"].replace("Z", "+00:00")), int(r["numero"])) for r in rodadas
+    )
 
 
 # ---------------------------------------------------------------- gravação
