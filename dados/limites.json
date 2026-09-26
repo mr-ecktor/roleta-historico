@@ -9,9 +9,34 @@
     "min": 2.5,
     "moeda": "BRL"
   },
+  "Brazilian Roulette (Pragmatic)": {
+    "max": 50000.0,
+    "min": 0.5,
+    "moeda": "BRL"
+  },
+  "Mega Roulette (Pragmatic)": {
+    "max": 50000.0,
+    "min": 0.5,
+    "moeda": "BRL"
+  },
+  "Mega Roulette Brazilian (Pragmatic)": {
+    "max": 50000.0,
+    "min": 0.5,
+    "moeda": "BRL"
+  },
   "Speed Auto Roulette (Pragmatic)": {
     "max": 25000.0,
     "min": 2.5,
+    "moeda": "BRL"
+  },
+  "Speed Roulette 1 (Pragmatic)": {
+    "max": 25000.0,
+    "min": 2.5,
+    "moeda": "BRL"
+  },
+  "Speed Roulette 2 (Pragmatic)": {
+    "max": 50000.0,
+    "min": 0.5,
     "moeda": "BRL"
   }
 }
