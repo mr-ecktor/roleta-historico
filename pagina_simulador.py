@@ -163,9 +163,10 @@ def pagina_simulador(por_mesa, limites):
                                        disabled=rodando, help=AJUDA_GATILHO),
             "ficha": d2.number_input("Ficha inicial (R$)", min_value=0.10, max_value=10000.0, value=ficha_padrao, step=0.50,
                                      format="%.2f", key=f"sim_ficha_{g}_{mesa}", disabled=rodando),
-            "max_rec": d3.number_input("Máx. recuperações", min_value=0, max_value=max_niveis, value=min(3, max_niveis),
+            "max_rec": d3.number_input("Máx. recuperações", min_value=1, max_value=50 + max_niveis + 1, value=8,
                                        step=1, key=f"sim_rec_{g}", disabled=rodando,
-                                       help="Até qual nível da sua tabela de recuperação o robô vai"),
+                                       help="Conta desde o início do gatilho. O robô faz (Máx. recuperações − Gatilho) "
+                                            "apostas por ciclo. Ex.: gatilho 5 e máximo 8 = 3 apostas (0,50 → 1,50 → 3,50)."),
         }
     if len(grupos) > 1:
         d4, _, _, _ = st.columns(4)
@@ -176,12 +177,28 @@ def pagina_simulador(por_mesa, limites):
         aviso("Escolha pelo menos um padrão em <b>Apostar em</b>.")
         return
 
-    fichas_por_padrao = {p: sequencia_da_tabela(p, ajustes[PAGAMENTO[p]]["ficha"], int(ajustes[PAGAMENTO[p]]["max_rec"]))
+    # Máx. recuperações conta desde o início do gatilho: apostas por ciclo = máximo − gatilho
+    for g, a in ajustes.items():
+        a["apostas"] = int(a["max_rec"]) - int(a["gatilho"])
+    grupos_invalidos = [g for g in grupos if ajustes[g]["apostas"] < 1]
+    if grupos_invalidos:
+        onde = (" em " + " e ".join(NOME_GRUPO[g] for g in grupos_invalidos)) if len(grupos) > 1 else ""
+        alerta(f"O Máx. recuperações precisa ser maior que o Gatilho{onde} — do contrário não sobra nenhuma aposta por ciclo.")
+        return
+    for g, a in ajustes.items():
+        niveis = niveis_tabela("Dúzias" if g == 2 else "Vermelho / Preto")
+        if a["apostas"] > niveis:
+            alerta(f"A sua tabela de {NOME_GRUPO[g]} tem {niveis} níveis; o robô vai usar no máximo {niveis} apostas por ciclo.")
+            a["apostas"] = niveis
+    fichas_por_padrao = {p: sequencia_da_tabela(p, ajustes[PAGAMENTO[p]]["ficha"], ajustes[PAGAMENTO[p]]["apostas"] - 1)
                          for p in padroes_usados}
     gatilhos = {c: int(ajustes[PAGAMENTO[CATEGORIAS[c]]]["gatilho"]) for c in categorias}
     risco_cada = {c: sum(fichas_por_padrao[CATEGORIAS[c]]) for c in categorias}
     risco_total = sum(risco_cada.values())
-    texto_risco = f"Valor em risco por ciclo: <b>{reais(risco_total)}</b>"
+    apostas_txt = " · ".join(
+        (f"{NOME_GRUPO[g]}: " if len(grupos) > 1 else "") + f"<b>{a['apostas']}</b> aposta{'' if a['apostas'] == 1 else 's'} por ciclo "
+        f"({int(a['max_rec'])} − {int(a['gatilho'])})" for g, a in ajustes.items())
+    texto_risco = f"{apostas_txt}<br>Valor em risco por ciclo: <b>{reais(risco_total)}</b>"
     if len(categorias) > 1:
         texto_risco += " — se todos estiverem em ciclo ao mesmo tempo (" + " + ".join(
             f"{escape(c)} {reais(v)}" for c, v in risco_cada.items()) + ")"
