@@ -5,11 +5,21 @@ Site de análise das roletas. Para rodar no PC:  python -m streamlit run app.py
 import base64
 import hashlib
 import hmac
+import importlib
 from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
 
 import streamlit as st
+
+import analise
+import pagina_simulador
+import simulador
+
+# O Streamlit Cloud atualiza os arquivos a cada push, mas pode manter a versão antiga dos módulos
+# em memória (ex.: formatar_limite sem o parâmetro do padrão -> TypeError). Recarrega sempre.
+for _modulo in (analise, simulador, pagina_simulador):
+    importlib.reload(_modulo)
 
 from analise import (FUSO_BRASILIA, PADROES, PERIODOS, analisar, carregar_giros, carregar_limites,
                      filtrar_periodo, formatar_limite)
