@@ -59,6 +59,8 @@ CSS = """
 .num.verm { background: #b91c1c; }
 .num.preto { background: #27272a; border: 1px solid #3f3f46; }
 .num.zero { background: #15803d; }
+.historico .rolagem { max-height: 560px; overflow-y: auto; }
+.historico thead th { position: sticky; top: 0; background: #16161a; z-index: 1; }
 .historico td.ganhou { color: #4ade80; }
 .historico td.perdeu { color: #f87171; }
 .st-key-sim_start button {
@@ -226,6 +228,7 @@ def pagina_simulador(por_mesa, limites):
 
     if st.session_state.get("ao_vivo"):
         painel_ao_vivo()
+        historico_ao_vivo()
     else:
         aviso("Configure a estratégia e aperte <b>Start</b>. A simulação acompanha os giros reais da mesa a partir desse "
               "momento, sem fazer apostas de verdade. Mantenha esta aba aberta enquanto ela roda.")
@@ -295,24 +298,37 @@ def painel_ao_vivo():
         unsafe_allow_html=True,
     )
 
-    # Histórico ao vivo: uma linha por aposta resolvida, mais recentes primeiro
-    st.markdown('<p class="secao">Histórico ao vivo <span>· mais recentes primeiro</span></p>', unsafe_allow_html=True)
-    if not sim.historico:
+
+def linha_historico(h):
+    nivel = "—" if h["nivel"] is None else ("Entrada" if h["nivel"] == 0 else f"Recuperação {h['nivel']}")
+    classe = "ganhou" if h["lucro"] > 0 else "perdeu" if h["lucro"] < 0 else ""
+    return (
+        f"<tr><td>{h['horario'].astimezone(FUSO_BRASILIA):%H:%M:%S}</td><td class='c'>{cor_numero(h['numero'])}</td>"
+        f"<td>{escape(h['categoria'])}</td><td class='c'>{reais(h['aposta']) if h['aposta'] else '—'}</td>"
+        f"<td>{nivel}</td><td class='{classe}'>{escape(h['resultado'])}</td>"
+        f"<td class='c {classe}'>{reais(h['lucro'], sinal=True)}</td><td class='c'><b>{reais(h['caixa'])}</b></td></tr>"
+    )
+
+
+@st.fragment(run_every=3)
+def historico_ao_vivo():
+    """Todas as apostas desde o Start, mais recentes primeiro (atualiza a cada ~3 s, separado do cronômetro)."""
+    sessao = st.session_state.get("ao_vivo")
+    if not sessao:
+        return
+    historico = sessao["sim"].historico
+    total = len(historico)
+    st.markdown(f'<p class="secao">Histórico ao vivo <span>· {total} aposta{"" if total == 1 else "s"} desde o Start · '
+                'mais recentes primeiro</span></p>', unsafe_allow_html=True)
+    if not historico:
         aviso("Nenhuma aposta resolvida ainda. Elas aparecem aqui assim que um gatilho for atingido e o próximo giro sair.")
         return
-    linhas = []
-    for h in reversed(sim.historico[-200:]):
-        nivel = "—" if h["nivel"] is None else ("Entrada" if h["nivel"] == 0 else f"Recuperação {h['nivel']}")
-        classe = "ganhou" if h["lucro"] > 0 else "perdeu" if h["lucro"] < 0 else ""
-        linhas.append(
-            f"<tr><td>{h['horario'].astimezone(FUSO_BRASILIA):%H:%M:%S}</td><td class='c'>{cor_numero(h['numero'])}</td>"
-            f"<td>{escape(h['categoria'])}</td><td class='c'>{reais(h['aposta']) if h['aposta'] else '—'}</td>"
-            f"<td>{nivel}</td><td class='{classe}'>{escape(h['resultado'])}</td>"
-            f"<td class='c {classe}'>{reais(h['lucro'], sinal=True)}</td><td class='c'><b>{reais(h['caixa'])}</b></td></tr>"
-        )
+    # guarda as linhas já montadas e só monta as novas
+    linhas = sessao.setdefault("linhas_html", [])
+    linhas.extend(linha_historico(h) for h in historico[len(linhas):])
     st.markdown(
-        '<div class="card ranking historico"><div class="rolagem"><table><tr><th>Horário</th><th class="c">Número</th>'
+        '<div class="card ranking historico"><div class="rolagem"><table><thead><tr><th>Horário</th><th class="c">Número</th>'
         '<th>Aposta em</th><th class="c">Valor</th><th>Nível</th><th>Resultado</th><th class="c">Lucro</th>'
-        '<th class="c">Caixa</th></tr>' + "".join(linhas) + "</table></div></div>",
+        '<th class="c">Caixa</th></tr></thead><tbody>' + "".join(reversed(linhas)) + "</tbody></table></div></div>",
         unsafe_allow_html=True,
     )
