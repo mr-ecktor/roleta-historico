@@ -195,7 +195,7 @@ def pagina_simulador(por_mesa, limites):
     if risco_total > banca:
         alerta(f"Os ciclos completos somam {reais(risco_total)}, mais que a banca inicial ({reais(banca)}).")
 
-    b1, b2, _ = st.columns([1, 1, 4])
+    b1, _ = st.columns([1, 5])
     if not rodando:
         if b1.button("▶ Start", key="sim_start", use_container_width=True):
             try:
@@ -212,10 +212,7 @@ def pagina_simulador(por_mesa, limites):
                 "ultimo_giro": anteriores[-1][:2] if anteriores else None, "erro": None,
             }
             st.rerun()
-        if sessao and b2.button("Zerar", key="sim_zerar", use_container_width=True):
-            del st.session_state.ao_vivo
-            st.rerun()
-    elif b1.button("■ Parar", key="sim_parar", use_container_width=True):
+    elif b1.button("■ Stop", key="sim_parar", use_container_width=True):
         sessao["rodando"] = False
         sessao["fim"] = datetime.now(timezone.utc)
         st.rerun()
