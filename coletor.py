@@ -33,6 +33,7 @@ MESAS_TIPMINER = {
     "dfa678e4-4452-4723-a97d-f3703302d5cc": "Immersive Roulette",
     "b79aa4ce-82f0-4590-9bfd-efd3b7367c8a": "Auto-Roulette VIP",
     "d5ac92b3-d28e-4a3d-8117-9695a24c0053": "Roleta Ao Vivo",
+    "099cabf2-6ced-449e-999c-ad48e663071e": "Speed Roulette (Evolution)",
 }
 
 # Pragmatic Play: "id da mesa no lobby": "nome amigável"
@@ -40,6 +41,12 @@ MESAS_PRAGMATIC = {
     "210": "Auto Mega Roulette (Pragmatic)",
     "225": "Auto Roulette (Pragmatic)",
     "226": "Speed Auto Roulette (Pragmatic)",
+    # Mesas disponíveis na Jonbet (guardam só 20 giros: a coleta a cada 5 min cobre com folga)
+    "237": "Brazilian Roulette (Pragmatic)",
+    "204": "Mega Roulette (Pragmatic)",
+    "287": "Mega Roulette Brazilian (Pragmatic)",
+    "203": "Speed Roulette 1 (Pragmatic)",
+    "205": "Speed Roulette 2 (Pragmatic)",
 }
 
 MESAS_ATIVAS = list(MESAS_EVOLUTION.values()) + list(MESAS_TIPMINER.values()) + list(MESAS_PRAGMATIC.values())
