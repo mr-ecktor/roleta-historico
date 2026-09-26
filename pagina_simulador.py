@@ -68,6 +68,13 @@ CSS = """
 }
 .st-key-sim_start button p { color: #0b0b0d !important; font-weight: 700; }
 .st-key-sim_start button:hover { filter: brightness(1.08); box-shadow: 0 10px 32px -6px rgba(255, 106, 0, .85); }
+.st-key-sim_parar button {
+    background: linear-gradient(135deg, #f87171 0%, #dc2626 60%, #b91c1c 100%) !important; border: none !important;
+    color: #fff !important; opacity: 1 !important; font-family: 'Sora', sans-serif; font-weight: 700; letter-spacing: .02em;
+    box-shadow: 0 8px 28px -8px rgba(220, 38, 38, .75);
+}
+.st-key-sim_parar button p { color: #fff !important; font-weight: 700; }
+.st-key-sim_parar button:hover { filter: brightness(1.1); box-shadow: 0 10px 32px -6px rgba(220, 38, 38, .9); }
 .aviso-start { display: flex; align-items: center; gap: .8rem; background: var(--fundo-card); border: 1px solid var(--borda);
                border-left: 3px solid var(--laranja); border-radius: 12px; padding: .85rem 1.1rem; color: #d4d4d8; font-size: .92rem; margin-top: .6rem; }
 .aviso-start b { color: var(--laranja); }
