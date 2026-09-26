@@ -28,6 +28,8 @@ LIMITES_MANUAIS = {
     "Immersive Roulette": {"min": 2.5, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
     "Roleta Ao Vivo": {"min": 1, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
     "Speed Roulette (Evolution)": {"min": 2.5, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
+    "Brazilian Roulette (Pragmatic)": {"min": 0.5, "max": 50000, "max_1a1": 50000, "max_2a1": 30000, "moeda": "BRL"},
+    "Speed Roulette 2 (Pragmatic)": {"min": 0.5, "max": 50000, "max_1a1": 50000, "max_2a1": 30000, "moeda": "BRL"},
     # Casa anterior (mesas que a Jonbet não tem)
     "Auto Roulette (Evolution)": {"min": 0.5, "max": 25000, "moeda": "BRL"},
     "Auto-Roulette VIP": {"min": 0.5, "max": 25000, "moeda": "BRL"},
