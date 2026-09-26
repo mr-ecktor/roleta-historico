@@ -245,7 +245,7 @@ limite_mesa = limites.get(mesa)
 padrao = c2.selectbox(
     "Padrão",
     list(PADROES),
-    format_func=lambda p: f"{p}  ({formatar_limite(limite_mesa)})" if limite_mesa else p,
+    format_func=lambda p: f"{p}  ({formatar_limite(limite_mesa, p)})" if limite_mesa else p,
 )
 periodo = c3.selectbox("Período", list(PERIODOS), index=1)
 

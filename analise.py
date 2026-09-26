@@ -22,12 +22,26 @@ NOMES_ANTIGOS = {"Auto Roulette": "Auto Roulette (Evolution)"}
 
 # Limites de aposta das mesas Evolution (não há fonte pública; valores do painel "Limites" do cassino).
 # Formato: "Nome da mesa": {"min": 0.5, "max": 25000, "moeda": "BRL"}
+# Opcional: "max_1a1" (cor, par/ímpar, alto/baixo) e "max_2a1" (dúzias e colunas) = máximo por tipo de aposta.
 LIMITES_MANUAIS = {
-    "Immersive Roulette": {"min": 2.5, "max": 25000, "moeda": "BRL"},
+    # Jonbet — lidos da tabela "Limites de apostas" de cada mesa pela extensão Guardian (26/09/2026)
+    "Immersive Roulette": {"min": 2.5, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
+    "Roleta Ao Vivo": {"min": 1, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
+    "Speed Roulette (Evolution)": {"min": 2.5, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
+    # Casa anterior (mesas que a Jonbet não tem)
     "Auto Roulette (Evolution)": {"min": 0.5, "max": 25000, "moeda": "BRL"},
     "Auto-Roulette VIP": {"min": 0.5, "max": 25000, "moeda": "BRL"},
-    "Roleta Ao Vivo": {"min": 0.5, "max": 25000, "moeda": "BRL"},
 }
+
+PAGAMENTO_DO_PADRAO = {"Vermelho / Preto": 1, "Par / Ímpar": 1, "Baixo / Alto": 1, "Dúzias": 2, "Colunas": 2}
+
+
+def limite_do_padrao(lim, padrao):
+    """Limite da mesa para um padrão: usa o máximo específico do tipo de aposta quando a mesa informa."""
+    if not lim or not padrao:
+        return lim
+    chave = "max_2a1" if PAGAMENTO_DO_PADRAO.get(padrao) == 2 else "max_1a1"
+    return {**lim, "max": lim.get(chave, lim["max"])}
 
 PASTA_DADOS = Path(__file__).parent / "dados"
 FUSO_BRASILIA = timezone(timedelta(hours=-3))
@@ -106,13 +120,15 @@ def carregar_limites():
     return {**limites, **LIMITES_MANUAIS}
 
 
-def formatar_limite(lim):
-    """Ex.: {"min": 0.5, "max": 25000} -> "R$ 0,50 – 25.000"."""
+def formatar_limite(lim, padrao=None):
+    """Ex.: {"min": 0.5, "max": 25000} -> "R$ 0,50 – 25.000". Com padrão, usa o máximo daquele tipo de aposta."""
+    lim = limite_do_padrao(lim, padrao)
     def reais(v):
         texto = f"{v:,.2f}" if v % 1 else f"{v:,.0f}"
         return texto.replace(",", "X").replace(".", ",").replace("X", ".")
     simbolo = "R$ " if lim.get("moeda", "BRL") == "BRL" else f'{lim["moeda"]} '
-    return f'{simbolo}{reais(lim["min"])} – {reais(lim["max"])}'
+    minimo = f'{lim["min"]:,.2f}'.replace(",", "X").replace(".", ",").replace("X", ".")   # mínimo sempre com centavos
+    return f'{simbolo}{minimo} – {reais(lim["max"])}'
 
 
 def filtrar_periodo(giros, periodo, agora=None):

@@ -190,12 +190,19 @@ class SimulacaoAoVivo:
         if not isinstance(gatilhos, dict):
             gatilhos = {c: gatilhos for c in categorias}
         self.robos = [_Robo(c, fichas_por_padrao[CATEGORIAS[c]], gatilhos[c]) for c in categorias]
+        # limite_max: um valor para todos os padrões, ou {1: máx. cor/par/alto, 2: máx. dúzias/colunas}
         self.banca, self.limite_max = banca, limite_max
         self.saldo = banca
         self.historico = []  # uma linha por aposta resolvida
         self.ultimo_horario = None
         self.giros_vistos = 0
         self.quebrou = False
+
+    def _limite(self, robo):
+        """Aposta máxima permitida pela mesa para o tipo de aposta deste padrão."""
+        if isinstance(self.limite_max, dict):
+            return self.limite_max.get(PAGAMENTO[robo.padrao])
+        return self.limite_max
 
     # ---------------------------------------------------------------- giros
     def aquecer(self, giros):
@@ -240,7 +247,7 @@ class SimulacaoAoVivo:
                         robo.estouros += 1
                         self._registrar(horario, numero, robo, aposta, -aposta, "Perdeu — estourou", nivel)
                         robo.ciclo, robo.aguardar_saida = None, True
-                    elif self.limite_max is not None and robo.fichas[proximo] > self.limite_max:
+                    elif self._limite(robo) is not None and robo.fichas[proximo] > self._limite(robo):
                         robo.estouros += 1
                         self._registrar(horario, numero, robo, aposta, -aposta, "Perdeu — limite da mesa", nivel)
                         robo.ciclo, robo.aguardar_saida = None, True

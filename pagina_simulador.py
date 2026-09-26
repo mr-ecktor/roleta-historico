@@ -12,12 +12,13 @@ from html import escape
 
 import streamlit as st
 
-from analise import FUSO_BRASILIA, VERMELHOS, formatar_limite
+from analise import FUSO_BRASILIA, VERMELHOS, formatar_limite, limite_do_padrao
 from coletor import buscar_ao_vivo
 from simulador import CATEGORIAS, PAGAMENTO, SimulacaoAoVivo, niveis_tabela, sequencia_da_tabela
 
 ATUALIZAR_A_CADA_S = 10
 NOME_GRUPO = {1: "Cor, Par/Ímpar e Alto/Baixo", 2: "Dúzias e Colunas"}
+MAX_RECUPERACOES = {1: 15, 2: 22}  # limites da tabela de recuperação do usuário
 
 
 def reais(v, sinal=False):
@@ -161,9 +162,10 @@ def pagina_simulador(por_mesa, limites):
         ajustes[g] = {
             "gatilho": d1.number_input("Gatilho", min_value=0, max_value=50, value=5, step=1, key=f"sim_gatilho_{g}",
                                        disabled=rodando, help=AJUDA_GATILHO),
-            "ficha": d2.number_input("Ficha inicial (R$)", min_value=0.10, max_value=10000.0, value=ficha_padrao, step=0.50,
+            "ficha": d2.number_input("Ficha inicial (R$)", min_value=float(limite["min"]) if limite else 0.10,
+                                     max_value=10000.0, value=ficha_padrao, step=0.50,
                                      format="%.2f", key=f"sim_ficha_{g}_{mesa}", disabled=rodando),
-            "max_rec": d3.number_input("Máx. recuperações", min_value=1, max_value=50 + max_niveis + 1, value=8,
+            "max_rec": d3.number_input("Máx. recuperações", min_value=1, max_value=MAX_RECUPERACOES[g], value=8,
                                        step=1, key=f"sim_rec_{g}", disabled=rodando,
                                        help="Conta desde o início do gatilho. O robô faz (Máx. recuperações − Gatilho) "
                                             "apostas por ciclo. Ex.: gatilho 5 e máximo 8 = 3 apostas (0,50 → 1,50 → 3,50)."),
@@ -213,11 +215,15 @@ def pagina_simulador(por_mesa, limites):
                 st.markdown(f"**{NOME_GRUPO[pagamento]}**")
             st.markdown(tabela_niveis(fichas_por_padrao[p], p), unsafe_allow_html=True)
 
-    maior_ficha = max(f[-1] for f in fichas_por_padrao.values())
     if limite and min(a["ficha"] for a in ajustes.values()) < limite["min"]:
         alerta(f"A ficha inicial está abaixo do mínimo desta mesa ({formatar_limite(limite)}).")
-    if limite and maior_ficha > limite["max"]:
-        alerta(f"A última recuperação ({reais(maior_ficha)}) passa do máximo desta mesa ({formatar_limite(limite)}).")
+    # máximo da mesa por tipo de aposta (cor/par/alto e dúzias/colunas podem ter máximos diferentes)
+    maximos = {g: limite_do_padrao(limite, "Dúzias" if g == 2 else "Vermelho / Preto")["max"] for g in (1, 2)} if limite else None
+    for p, fichas in fichas_por_padrao.items():
+        g = PAGAMENTO[p]
+        if maximos and fichas[-1] > maximos[g]:
+            alerta(f"{NOME_GRUPO[g]}: a última recuperação ({reais(fichas[-1])}) passa do máximo da mesa para esse tipo de aposta ({reais(maximos[g])}).")
+            break
     if risco_total > banca:
         alerta(f"Os ciclos completos somam {reais(risco_total)}, mais que a banca inicial ({reais(banca)}).")
 
@@ -229,8 +235,7 @@ def pagina_simulador(por_mesa, limites):
             except Exception as erro:
                 st.error(f"Não foi possível ler a mesa agora ({erro}). Tente de novo em alguns segundos.")
                 return
-            sim = SimulacaoAoVivo(categorias, gatilhos, fichas_por_padrao, banca,
-                                  limite_max=limite["max"] if limite else None)
+            sim = SimulacaoAoVivo(categorias, gatilhos, fichas_por_padrao, banca, limite_max=maximos)
             sim.aquecer([(t, n) for t, n, _ in anteriores])
             st.session_state.ao_vivo = {
                 "sim": sim, "mesa": mesa, "inicio": datetime.now(timezone.utc), "fim": None, "rodando": True,
