@@ -18,21 +18,26 @@ from pathlib import Path
 from coletor import ARQUIVO_LIMITES, MESAS_ATIVAS
 
 # Nomes usados nos CSVs antigos -> nome atual
-NOMES_ANTIGOS = {"Auto Roulette": "Auto Roulette (Evolution)"}
+NOMES_ANTIGOS = {
+    "Auto Roulette": "Auto Roulette (Evolution)",
+    "Immersive Roulette": "Immersive Roulette (Evolution)",
+    "Auto-Roulette VIP": "Auto-Roulette VIP (Evolution)",
+    "Roleta Ao Vivo": "Roleta Ao Vivo (Evolution)",
+}
 
 # Limites de aposta das mesas Evolution (não há fonte pública; valores do painel "Limites" do cassino).
 # Formato: "Nome da mesa": {"min": 0.5, "max": 25000, "moeda": "BRL"}
 # Opcional: "max_1a1" (cor, par/ímpar, alto/baixo) e "max_2a1" (dúzias e colunas) = máximo por tipo de aposta.
 LIMITES_MANUAIS = {
     # Jonbet — lidos da tabela "Limites de apostas" de cada mesa pela extensão Guardian (26/09/2026)
-    "Immersive Roulette": {"min": 2.5, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
-    "Roleta Ao Vivo": {"min": 1, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
+    "Immersive Roulette (Evolution)": {"min": 2.5, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
+    "Roleta Ao Vivo (Evolution)": {"min": 1, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
     "Speed Roulette (Evolution)": {"min": 2.5, "max": 100000, "max_1a1": 100000, "max_2a1": 60000, "moeda": "BRL"},
     "Brazilian Roulette (Pragmatic)": {"min": 0.5, "max": 50000, "max_1a1": 50000, "max_2a1": 30000, "moeda": "BRL"},
     "Speed Roulette 2 (Pragmatic)": {"min": 0.5, "max": 50000, "max_1a1": 50000, "max_2a1": 30000, "moeda": "BRL"},
     # Casa anterior (mesas que a Jonbet não tem)
     "Auto Roulette (Evolution)": {"min": 0.5, "max": 25000, "moeda": "BRL"},
-    "Auto-Roulette VIP": {"min": 0.5, "max": 25000, "moeda": "BRL"},
+    "Auto-Roulette VIP (Evolution)": {"min": 0.5, "max": 25000, "moeda": "BRL"},
 }
 
 PAGAMENTO_DO_PADRAO = {"Vermelho / Preto": 1, "Par / Ímpar": 1, "Baixo / Alto": 1, "Dúzias": 2, "Colunas": 2}
@@ -244,7 +249,7 @@ def tabela(resultado_categoria, tamanhos):
 if __name__ == "__main__":
     # Teste rápido pelo terminal
     dados = carregar_giros()
-    mesa = "Immersive Roulette"
+    mesa = "Immersive Roulette (Evolution)"
     giros = filtrar_periodo(dados[mesa], "Tudo")
     res, tamanhos = analisar(giros, "Vermelho / Preto")
     print(f"{mesa}: {len(giros)} giros em {len(tamanhos)} trecho(s)\n")

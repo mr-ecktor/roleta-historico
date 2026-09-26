@@ -30,9 +30,9 @@ MESAS_EVOLUTION = {
 
 # Evolution via TipMiner (mesas que o CasinoScores não acompanha): "id público (pid)": "nome amigável"
 MESAS_TIPMINER = {
-    "dfa678e4-4452-4723-a97d-f3703302d5cc": "Immersive Roulette",
-    "b79aa4ce-82f0-4590-9bfd-efd3b7367c8a": "Auto-Roulette VIP",
-    "d5ac92b3-d28e-4a3d-8117-9695a24c0053": "Roleta Ao Vivo",
+    "dfa678e4-4452-4723-a97d-f3703302d5cc": "Immersive Roulette (Evolution)",
+    "b79aa4ce-82f0-4590-9bfd-efd3b7367c8a": "Auto-Roulette VIP (Evolution)",
+    "d5ac92b3-d28e-4a3d-8117-9695a24c0053": "Roleta Ao Vivo (Evolution)",
     "099cabf2-6ced-449e-999c-ad48e663071e": "Speed Roulette (Evolution)",
 }
 
