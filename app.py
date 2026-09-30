@@ -21,8 +21,7 @@ import simulador
 for _modulo in (analise, simulador, pagina_simulador):
     importlib.reload(_modulo)
 
-from analise import (FUSO_BRASILIA, PADROES, PERIODOS, analisar, carregar_giros, carregar_limites,
-                     filtrar_periodo, formatar_limite)
+from analise import FUSO_BRASILIA, PADROES, analisar, carregar_giros, carregar_limites, formatar_limite
 
 ASSETS = Path(__file__).parent / "assets"
 
@@ -249,7 +248,7 @@ if modo == "Simulador":
     pagina_simulador(por_mesa, limites)
     st.stop()
 
-c1, c2, c3 = st.columns(3)
+c1, c2 = st.columns(2)
 mesa = c1.selectbox("Roleta", sorted(por_mesa))
 limite_mesa = limites.get(mesa)
 padrao = c2.selectbox(
@@ -257,14 +256,13 @@ padrao = c2.selectbox(
     list(PADROES),
     format_func=lambda p: f"{p}  ({formatar_limite(limite_mesa, p)})" if limite_mesa else p,
 )
-periodo = c3.selectbox("Período", list(PERIODOS), index=1)
 
 # ---------------------------------------------------------------- ranking das mesas
-def ranking_mesas(padrao, periodo):
+def ranking_mesas(padrao):
     """Mesas ordenadas pela maior ausência registrada (recorde) do padrão, da menor para a maior."""
     linhas = []
     for nome_mesa, todos in por_mesa.items():
-        giros_mesa = filtrar_periodo(todos, periodo)
+        giros_mesa = todos  # histórico completo desde o início da coleta
         if not giros_mesa:
             continue
         res, _ = analisar(giros_mesa, padrao)
@@ -276,7 +274,7 @@ def ranking_mesas(padrao, periodo):
     return linhas
 
 
-linhas_ranking = ranking_mesas(padrao, periodo)
+linhas_ranking = ranking_mesas(padrao)
 if linhas_ranking:
     categorias = list(PADROES[padrao])
     cab = "".join(f"<th class='c'>{escape(c)}</th>" for c in categorias)
@@ -291,8 +289,8 @@ if linhas_ranking:
             f"<td class='c'>{qtd_fmt}</td><td>{formatar_limite(lim) if lim else '—'}</td></tr>"
         )
     st.markdown(
-        f'<p class="secao">Ranking das mesas <span>· {escape(padrao)} · {escape(periodo)}</span></p>'
-        '<p class="secao-sub">Maior sequência sem sair de cada categoria. Ranking da melhor mesa para a pior no padrão e período selecionado.</p>'
+        f'<p class="secao">Ranking das mesas <span>· {escape(padrao)} · desde o início da coleta</span></p>'
+        '<p class="secao-sub">Maior sequência sem sair de cada categoria. Ranking da melhor mesa para a pior no padrão selecionado, com todo o histórico.</p>'
         f'<div class="card ranking"><div class="rolagem"><table><tr><th>#</th><th>Mesa</th>{cab}'
         f'<th class="c">Rodadas</th><th>Limite</th></tr>{"".join(corpo)}</table></div></div>',
         unsafe_allow_html=True,
@@ -302,16 +300,16 @@ with st.expander("Como ler esta análise"):
     st.markdown(
         """
 - **Rodadas sem sair**: por quantas rodadas seguidas o padrão **não** apareceu. O **zero conta como "não saiu"** para todos os padrões.
-- **Vezes**: quantas vezes aconteceu uma ausência exatamente desse tamanho no período escolhido.
-- **Ranking das mesas**: compara todas as mesas no padrão e período escolhidos pelo **recorde** (maior sequência sem sair) de cada categoria. Fica em 1º a mesa cujo pior recorde é o menor; empates são desempatados pela soma dos recordes. Mesas com mais rodadas analisadas tendem a ter recordes maiores — confira a coluna *Rodadas*.
+- **Vezes**: quantas vezes aconteceu uma ausência exatamente desse tamanho em todo o histórico coletado.
+- **Ranking das mesas**: compara todas as mesas no padrão escolhido, com todo o histórico, pelo **recorde** (maior sequência sem sair) de cada categoria. Fica em 1º a mesa cujo pior recorde é o menor; empates são desempatados pela soma dos recordes. Mesas com mais rodadas analisadas tendem a ter recordes maiores — confira a coluna *Rodadas*.
 - A ausência que ainda está em andamento (o padrão ainda não voltou a sair) só entra na contagem quando termina.
 - Cada rodada é independente: um padrão estar há muito tempo sem sair **não aumenta** a chance de ele sair na próxima.
 """
     )
 
-giros = filtrar_periodo(por_mesa[mesa], periodo)
+giros = por_mesa[mesa]  # sempre o histórico completo: recordes reais, sem recorte de período
 if not giros:
-    st.warning("Nenhuma rodada registrada nesse período.")
+    st.warning("Nenhuma rodada registrada nessa mesa.")
     st.stop()
 
 primeiro = giros[0][0].astimezone(FUSO_BRASILIA)
@@ -323,7 +321,7 @@ partes = [
     f"<span>De <b>{primeiro:%d/%m %H:%M}</b> até <b>{ultimo:%d/%m %H:%M}</b> (Brasília)</span>",
 ]
 if len(tamanhos) > 1:
-    partes.append(f'<span class="alerta">⚠ {len(tamanhos) - 1} interrupção(ões) no período (pausa da mesa ou giro não registrado) — a contagem recomeça após cada uma</span>')
+    partes.append(f'<span class="alerta">⚠ {len(tamanhos) - 1} interrupção(ões) no histórico (pausa da mesa ou giro não registrado) — a contagem recomeça após cada uma</span>')
 descartes = [f"{nome}: {k} rodadas" for nome, r in resultado.items() for k in sorted(r["descartadas"])]
 if descartes:
     partes.append(f'<span class="alerta">⚠ Fora da análise por ser praticamente impossível numa roleta normal '
@@ -335,7 +333,7 @@ def cartao(nome, cor, contagem, compacto=False):
     classe = "card compacto" if compacto else "card"
     cabecalho = f'<div class="card-titulo"><span class="ponto" style="background:{cor};color:{cor}"></span>{escape(nome)}</div>'
     if not contagem:
-        return f'<div class="{classe}">{cabecalho}<div class="vazio">Nenhuma ausência completa nesse período.</div></div>'
+        return f'<div class="{classe}">{cabecalho}<div class="vazio">Nenhuma ausência completa registrada ainda.</div></div>'
     maior_vezes = max(contagem.values())
     barra_max = 44 if compacto else 70
     linhas = []
