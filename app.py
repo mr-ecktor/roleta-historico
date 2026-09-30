@@ -324,6 +324,10 @@ partes = [
 ]
 if len(tamanhos) > 1:
     partes.append(f'<span class="alerta">⚠ {len(tamanhos) - 1} interrupção(ões) no período (pausa da mesa ou giro não registrado) — a contagem recomeça após cada uma</span>')
+descartes = [f"{nome}: {k} rodadas" for nome, r in resultado.items() for k in sorted(r["descartadas"])]
+if descartes:
+    partes.append(f'<span class="alerta">⚠ Fora da análise por ser praticamente impossível numa roleta normal '
+                  f'(provável erro da fonte ou defeito da mesa): {escape("; ".join(descartes))} sem sair</span>')
 st.markdown(f'<div class="resumo">{"".join(partes)}</div>', unsafe_allow_html=True)
 
 

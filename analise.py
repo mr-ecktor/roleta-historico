@@ -54,6 +54,9 @@ PASTA_DADOS = Path(__file__).parent / "dados"
 FUSO_BRASILIA = timezone(timedelta(hours=-3))
 INTERVALO_MAXIMO = timedelta(minutes=10)  # acima disso consideramos falha na coleta
 FATOR_GIRO_FALTANDO = 1.6  # intervalo acima de 1,6x o ritmo normal da mesa = provável giro faltando
+# Sequência sem sair com chance menor que isso numa roleta honesta = erro da fonte ou defeito da mesa:
+# fica fora da análise (ex.: 48 giros sem a 3ª dúzia). Dá 21+ em cor/par/alto e 36+ em dúzias/colunas.
+CHANCE_ANOMALIA = 1e-6
 DUPLICADO = timedelta(seconds=15)  # mesmo número na mesma mesa com menos que isso = mesmo giro (fontes diferentes)
 
 VERMELHOS = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
@@ -214,8 +217,12 @@ def analisar(giros, padrao):
                     sem_sair += 1
             atual = sem_sair
         probabilidade = sum(1 for n in range(37) if saiu(n)) / 37
+        descartadas = {k: v for k, v in contagem.items() if (1 - probabilidade) ** k < CHANCE_ANOMALIA}
+        for k in descartadas:
+            del contagem[k]
         resultado[nome] = {
             "contagem": contagem,
+            "descartadas": descartadas,  # {rodadas: vezes} fora da análise por serem praticamente impossíveis
             "atual": atual,
             "probabilidade": probabilidade,
         }
