@@ -159,9 +159,9 @@ div[data-baseweb="select"] > div:hover { border-color: var(--laranja) !important
 .ranking tr.lider td { background: rgba(255, 106, 0, .10); }
 .ranking tr.lider td.pos { background: var(--degrade); -webkit-background-clip: text; background-clip: text; color: transparent; }
 /* Login */
-.login-logo { text-align: center; margin: 5vh 0 1.2rem; }
-.login-logo img { width: min(220px, 60%); filter: drop-shadow(0 0 28px rgba(255, 106, 0, .45)); }
-.login-texto { text-align: center; color: var(--texto-2); font-size: .92rem; margin-bottom: 1rem; }
+.login-logo { text-align: center; margin: 1vh 0 .6rem; }
+.login-logo img { width: min(150px, 45%, 22vh); filter: drop-shadow(0 0 28px rgba(255, 106, 0, .45)); }
+.login-texto { text-align: center; color: var(--texto-2); font-size: .92rem; margin-bottom: .6rem; }
 [data-testid="stForm"] {
     background: var(--fundo-card); border: 1px solid var(--borda); border-radius: 16px; padding: 1.4rem;
     backdrop-filter: blur(8px);
