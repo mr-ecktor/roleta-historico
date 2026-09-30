@@ -257,6 +257,67 @@ padrao = c2.selectbox(
     format_func=lambda p: f"{p}  ({formatar_limite(limite_mesa, p)})" if limite_mesa else p,
 )
 
+giros = por_mesa[mesa]  # sempre o histórico completo: recordes reais, sem recorte de período
+if not giros:
+    st.warning("Nenhuma rodada registrada nessa mesa.")
+    st.stop()
+
+primeiro = giros[0][0].astimezone(FUSO_BRASILIA)
+ultimo = giros[-1][0].astimezone(FUSO_BRASILIA)
+resultado, tamanhos = analisar(giros, padrao)
+
+partes = [
+    f"<span><b>{len(giros):,}</b> rodadas analisadas</span>".replace(",", "."),
+    f"<span>De <b>{primeiro:%d/%m %H:%M}</b> até <b>{ultimo:%d/%m %H:%M}</b> (Brasília)</span>",
+]
+if len(tamanhos) > 1:
+    partes.append(f'<span class="alerta">⚠ {len(tamanhos) - 1} interrupção(ões) no histórico (pausa da mesa ou giro não registrado) — a contagem recomeça após cada uma</span>')
+descartes = [f"{nome}: {k} rodadas" for nome, r in resultado.items() for k in sorted(r["descartadas"])]
+if descartes:
+    partes.append(f'<span class="alerta">⚠ Fora da análise por ser praticamente impossível numa roleta normal '
+                  f'(provável erro da fonte ou defeito da mesa): {escape("; ".join(descartes))} sem sair</span>')
+st.markdown(f'<div class="resumo">{"".join(partes)}</div>', unsafe_allow_html=True)
+
+
+with st.expander("Como ler esta análise"):
+    st.markdown(
+        """
+- **Rodadas sem sair**: por quantas rodadas seguidas o padrão **não** apareceu. O **zero conta como "não saiu"** para todos os padrões.
+- **Vezes**: quantas vezes aconteceu uma ausência exatamente desse tamanho em todo o histórico coletado.
+- **Ranking das mesas**: compara todas as mesas no padrão escolhido, com todo o histórico, pelo **recorde** (maior sequência sem sair) de cada categoria. Fica em 1º a mesa cujo pior recorde é o menor; empates são desempatados pela soma dos recordes. Mesas com mais rodadas analisadas tendem a ter recordes maiores — confira a coluna *Rodadas*.
+- A ausência que ainda está em andamento (o padrão ainda não voltou a sair) só entra na contagem quando termina.
+- Cada rodada é independente: um padrão estar há muito tempo sem sair **não aumenta** a chance de ele sair na próxima.
+"""
+    )
+
+
+
+def cartao(nome, cor, contagem, compacto=False):
+    classe = "card compacto" if compacto else "card"
+    cabecalho = f'<div class="card-titulo"><span class="ponto" style="background:{cor};color:{cor}"></span>{escape(nome)}</div>'
+    if not contagem:
+        return f'<div class="{classe}">{cabecalho}<div class="vazio">Nenhuma ausência completa registrada ainda.</div></div>'
+    maior_vezes = max(contagem.values())
+    barra_max = 44 if compacto else 70
+    linhas = []
+    for rodadas in sorted(contagem):
+        vezes = contagem[rodadas]
+        largura = max(4, round(barra_max * vezes / maior_vezes))
+        linhas.append(
+            f'<tr><td class="vezes"><span class="num">{vezes} {"vez" if vezes == 1 else "vezes"}</span>'
+            f'<span class="barra" style="width:{largura}px"></span></td>'
+            f'<td class="rodadas">{rodadas} rodada{"s" if rodadas > 1 else ""} sem sair</td></tr>'
+        )
+    return (f'<div class="{classe}">{cabecalho}<table><tr><th>Vezes</th><th>Rodadas sem sair</th></tr>'
+            f'{"".join(linhas)}</table></div>')
+
+
+colunas = st.columns(len(resultado))
+for i, (coluna, (nome, r)) in enumerate(zip(colunas, resultado.items())):
+    cor = CORES_CATEGORIA.get(nome, LARANJAS[i % 3])
+    coluna.markdown(cartao(nome, cor, r["contagem"], compacto=len(resultado) > 2), unsafe_allow_html=True)
+
+
 # ---------------------------------------------------------------- ranking das mesas
 def ranking_mesas(padrao):
     """Mesas ordenadas pela maior ausência registrada (recorde) do padrão, da menor para a maior."""
@@ -295,61 +356,3 @@ if linhas_ranking:
         f'<th class="c">Rodadas</th><th>Limite</th></tr>{"".join(corpo)}</table></div></div>',
         unsafe_allow_html=True,
     )
-
-with st.expander("Como ler esta análise"):
-    st.markdown(
-        """
-- **Rodadas sem sair**: por quantas rodadas seguidas o padrão **não** apareceu. O **zero conta como "não saiu"** para todos os padrões.
-- **Vezes**: quantas vezes aconteceu uma ausência exatamente desse tamanho em todo o histórico coletado.
-- **Ranking das mesas**: compara todas as mesas no padrão escolhido, com todo o histórico, pelo **recorde** (maior sequência sem sair) de cada categoria. Fica em 1º a mesa cujo pior recorde é o menor; empates são desempatados pela soma dos recordes. Mesas com mais rodadas analisadas tendem a ter recordes maiores — confira a coluna *Rodadas*.
-- A ausência que ainda está em andamento (o padrão ainda não voltou a sair) só entra na contagem quando termina.
-- Cada rodada é independente: um padrão estar há muito tempo sem sair **não aumenta** a chance de ele sair na próxima.
-"""
-    )
-
-giros = por_mesa[mesa]  # sempre o histórico completo: recordes reais, sem recorte de período
-if not giros:
-    st.warning("Nenhuma rodada registrada nessa mesa.")
-    st.stop()
-
-primeiro = giros[0][0].astimezone(FUSO_BRASILIA)
-ultimo = giros[-1][0].astimezone(FUSO_BRASILIA)
-resultado, tamanhos = analisar(giros, padrao)
-
-partes = [
-    f"<span><b>{len(giros):,}</b> rodadas analisadas</span>".replace(",", "."),
-    f"<span>De <b>{primeiro:%d/%m %H:%M}</b> até <b>{ultimo:%d/%m %H:%M}</b> (Brasília)</span>",
-]
-if len(tamanhos) > 1:
-    partes.append(f'<span class="alerta">⚠ {len(tamanhos) - 1} interrupção(ões) no histórico (pausa da mesa ou giro não registrado) — a contagem recomeça após cada uma</span>')
-descartes = [f"{nome}: {k} rodadas" for nome, r in resultado.items() for k in sorted(r["descartadas"])]
-if descartes:
-    partes.append(f'<span class="alerta">⚠ Fora da análise por ser praticamente impossível numa roleta normal '
-                  f'(provável erro da fonte ou defeito da mesa): {escape("; ".join(descartes))} sem sair</span>')
-st.markdown(f'<div class="resumo">{"".join(partes)}</div>', unsafe_allow_html=True)
-
-
-def cartao(nome, cor, contagem, compacto=False):
-    classe = "card compacto" if compacto else "card"
-    cabecalho = f'<div class="card-titulo"><span class="ponto" style="background:{cor};color:{cor}"></span>{escape(nome)}</div>'
-    if not contagem:
-        return f'<div class="{classe}">{cabecalho}<div class="vazio">Nenhuma ausência completa registrada ainda.</div></div>'
-    maior_vezes = max(contagem.values())
-    barra_max = 44 if compacto else 70
-    linhas = []
-    for rodadas in sorted(contagem):
-        vezes = contagem[rodadas]
-        largura = max(4, round(barra_max * vezes / maior_vezes))
-        linhas.append(
-            f'<tr><td class="vezes"><span class="num">{vezes} {"vez" if vezes == 1 else "vezes"}</span>'
-            f'<span class="barra" style="width:{largura}px"></span></td>'
-            f'<td class="rodadas">{rodadas} rodada{"s" if rodadas > 1 else ""} sem sair</td></tr>'
-        )
-    return (f'<div class="{classe}">{cabecalho}<table><tr><th>Vezes</th><th>Rodadas sem sair</th></tr>'
-            f'{"".join(linhas)}</table></div>')
-
-
-colunas = st.columns(len(resultado))
-for i, (coluna, (nome, r)) in enumerate(zip(colunas, resultado.items())):
-    cor = CORES_CATEGORIA.get(nome, LARANJAS[i % 3])
-    coluna.markdown(cartao(nome, cor, r["contagem"], compacto=len(resultado) > 2), unsafe_allow_html=True)
