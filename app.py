@@ -158,6 +158,27 @@ div[data-baseweb="select"] > div:hover { border-color: var(--laranja) !important
 .ranking td.pos { font-family: 'Sora', sans-serif; font-weight: 700; color: var(--texto-2); width: 3rem; }
 .ranking tr.lider td { background: rgba(255, 106, 0, .10); }
 .ranking tr.lider td.pos { background: var(--degrade); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* ranking com todos os padrões */
+.ranking table{width:100%;border-collapse:collapse;font-size:.86rem}
+.ranking th,.ranking td{padding:.55rem .5rem;border-bottom:1px solid #1f1f24;white-space:nowrap}
+.ranking th{font:600 .68rem Sora,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa}
+.ranking th.grupo{color:#ffb070;border-bottom:1px solid #3a2a1c}
+.ranking .ini{border-left:1px solid #2a2a30}
+.ranking th.fixo{vertical-align:middle;text-align:center;color:#f4f4f5;font-size:.72rem;padding-bottom:.6rem;border-bottom:1px solid #3f3f46}
+.ranking th.pos,.ranking td.pos{text-align:center;width:2.6rem}
+.ranking th.mesa-t{font-size:.9rem;letter-spacing:.12em}
+.ranking .sep{border-left:1px solid #3f3f46 !important}
+.ranking .meio{text-align:center;padding-left:1rem;padding-right:1rem}
+.ranking .esp,.ranking th.esp{width:14px;min-width:14px;padding:0;border:none !important;background:transparent !important}
+.ranking .bl{border-left:1px solid #3f3f46 !important}.ranking .br{border-right:1px solid #3f3f46 !important}
+.ranking th.bloco{background:#16161a;color:#f4f4f5;font-size:.72rem;border-top:1px solid #3f3f46;border-bottom:1px solid #3f3f46;border-radius:0}
+.ranking th.bloco span{color:#ff8a2a;margin-left:6px;letter-spacing:.04em}
+.ranking td.melhor{color:#4ade80;font-weight:700}
+.ranking td.pior{color:#f87171}
+.mesa{font-weight:600}.forn{font-size:.72rem;color:#71717a}
+.lim{color:#a1a1aa;font-size:.8rem}
+.legenda{display:flex;gap:18px;color:#a1a1aa;font-size:.8rem;margin:.7rem .2rem 0}
+.legenda b.g{color:#4ade80}.legenda b.r{color:#f87171}
 /* Login */
 .login-logo { text-align: center; margin: 1vh 0 .6rem; }
 .login-logo img { width: min(150px, 45%, 22vh); filter: drop-shadow(0 0 28px rgba(255, 106, 0, .45)); }
@@ -318,41 +339,95 @@ for i, (coluna, (nome, r)) in enumerate(zip(colunas, resultado.items())):
     coluna.markdown(cartao(nome, cor, r["contagem"], compacto=len(resultado) > 2), unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------- ranking das mesas
-def ranking_mesas(padrao):
-    """Mesas ordenadas pela maior ausência registrada (recorde) do padrão, da menor para a maior."""
-    linhas = []
-    for nome_mesa, todos in por_mesa.items():
-        giros_mesa = todos  # histórico completo desde o início da coleta
-        if not giros_mesa:
-            continue
-        res, _ = analisar(giros_mesa, padrao)
-        recordes = {cat: (max(r["contagem"]) if r["contagem"] else None) for cat, r in res.items()}
-        validos = [v for v in recordes.values() if v is not None]
-        chave = (max(validos), sum(validos)) if validos else (float("inf"), float("inf"))
-        linhas.append((chave, nome_mesa, recordes, len(giros_mesa)))
-    linhas.sort(key=lambda x: x[0])
-    return linhas
+# ---------------------------------------------------------------- ranking das mesas (todos os padrões)
+CURTO_RANKING = {"Vermelho": "Verm.", "Preto": "Preto", "Par": "Par", "Ímpar": "Ímpar", "Baixo (1-18)": "1-18",
+                 "Alto (19-36)": "19-36", "1ª dúzia (1-12)": "1ª", "2ª dúzia (13-24)": "2ª", "3ª dúzia (25-36)": "3ª",
+                 "1ª coluna": "1ª", "2ª coluna": "2ª", "3ª coluna": "3ª"}
+NOME_GRUPO = {"Vermelho / Preto": "Cor", "Par / Ímpar": "Par / Ímpar", "Baixo / Alto": "Baixo / Alto",
+              "Dúzias": "Dúzias", "Colunas": "Colunas"}
 
 
-linhas_ranking = ranking_mesas(padrao)
-if linhas_ranking:
-    categorias = list(PADROES[padrao])
-    cab = "".join(f"<th class='c'>{escape(c)}</th>" for c in categorias)
+def ranking_geral():
+    """Recorde de cada categoria em cada mesa; ordem pela colocação média da mesa nos 5 padrões."""
+    recordes, posicoes = {}, {}
+    for p in PADROES:
+        chaves = []
+        for nome_mesa, giros_mesa in por_mesa.items():
+            res, _ = analisar(giros_mesa, p)
+            r = {c: (max(x["contagem"]) if x["contagem"] else None) for c, x in res.items()}
+            recordes.setdefault(nome_mesa, {}).update(r)
+            v = [x for x in r.values() if x is not None]
+            chaves.append(((max(v), sum(v)) if v else (float("inf"), float("inf")), nome_mesa))
+        for i, (_, nome_mesa) in enumerate(sorted(chaves), 1):
+            posicoes.setdefault(nome_mesa, []).append(i)
+    ordem = sorted(recordes, key=lambda m: (sum(posicoes[m]) / len(posicoes[m]),
+                                            max((v for v in recordes[m].values() if v is not None), default=0)))
+    return ordem, recordes
+
+
+ordem_ranking, recordes_ranking = ranking_geral()
+if ordem_ranking:
+    primeira = {p: list(PADROES[p])[0] for p in PADROES}
+    ultima = {p: list(PADROES[p])[-1] for p in PADROES}
+
+    def classes(p, c):
+        k = " ini" if c == primeira[p] else ""
+        if p in ("Vermelho / Preto", "Dúzias") and c == primeira[p]:
+            k += " bl"
+        if p in ("Baixo / Alto", "Colunas") and c == ultima[p]:
+            k += " br"
+        return k
+
+    def por_coluna(fazer, espaco):
+        partes = []
+        for p in PADROES:
+            if p == "Dúzias":
+                partes.append(espaco)
+            partes += [fazer(p, c) for c in PADROES[p]]
+        return "".join(partes)
+
+    valores = {c: [recordes_ranking[m][c] for m in ordem_ranking if recordes_ranking[m][c] is not None]
+               for p in PADROES for c in PADROES[p]}
+    menor = {c: min(v) if v else None for c, v in valores.items()}
+    maior = {c: max(v) if v else None for c, v in valores.items()}
+
+    cab_blocos = ("<th class='c bloco bl br' colspan='6'>Cor · Par/Ímpar · Baixo/Alto <span>paga 1:1</span></th>"
+                  "<th class='esp'></th><th class='c bloco bl br' colspan='6'>Dúzias · Colunas <span>paga 2:1</span></th>")
+    cab_grupos = "".join(
+        ("<th class='esp'></th>" if p == "Dúzias" else "")
+        + f"<th class='c grupo{' bl' if p in ('Vermelho / Preto', 'Dúzias') else ''}"
+          f"{' br' if p in ('Baixo / Alto', 'Colunas') else ''}' colspan='{len(PADROES[p])}'>{NOME_GRUPO[p]}</th>"
+        for p in PADROES)
+    cab_categorias = por_coluna(lambda p, c: f"<th class='c sub{classes(p, c)}'>{CURTO_RANKING[c]}</th>",
+                                "<th class='esp'></th>")
     corpo = []
-    for pos, (_, nome_mesa, recordes, qtd) in enumerate(linhas_ranking, start=1):
-        cels = "".join(f"<td class='c'>{'—' if recordes[c] is None else recordes[c]}</td>" for c in categorias)
+    for pos, nome_mesa in enumerate(ordem_ranking, start=1):
+        def celula(p, c):
+            v = recordes_ranking[nome_mesa][c]
+            cl = "c" + classes(p, c)
+            if v is not None and v == menor[c]:
+                cl += " melhor"
+            elif v is not None and v == maior[c]:
+                cl += " pior"
+            return f"<td class='{cl}'>{'—' if v is None else v}</td>"
         lim = limites.get(nome_mesa)
-        destaque = " class='lider'" if pos == 1 else ""
-        qtd_fmt = f"{qtd:,}".replace(",", ".")
+        fornecedor = "Evolution" if "(Evolution)" in nome_mesa else "Pragmatic" if "(Pragmatic)" in nome_mesa else ""
+        nome_curto = nome_mesa.replace(" (Evolution)", "").replace(" (Pragmatic)", "")
+        qtd_fmt = f"{len(por_mesa[nome_mesa]):,}".replace(",", ".")
         corpo.append(
-            f"<tr{destaque}><td class='pos'>{pos}º</td><td>{escape(nome_mesa)}</td>{cels}"
-            f"<td class='c'>{qtd_fmt}</td><td>{formatar_limite(lim) if lim else '—'}</td></tr>"
+            f"<tr{' class=lider' if pos == 1 else ''}><td class='pos'>{pos}º</td>"
+            f"<td><div class='mesa'>{escape(nome_curto)}</div><div class='forn'>{fornecedor}</div></td>"
+            f"{por_coluna(celula, chr(60) + 'td class=esp></td>')}"
+            f"<td class='meio'>{qtd_fmt}</td><td class='lim meio sep'>{formatar_limite(lim) if lim else '—'}</td></tr>"
         )
     st.markdown(
-        f'<p class="secao">Ranking das mesas <span>· {escape(padrao)} · desde o início da coleta</span></p>'
-        '<p class="secao-sub">Maior sequência sem sair de cada categoria. Ranking da melhor mesa para a pior no padrão selecionado, com todo o histórico.</p>'
-        f'<div class="card ranking"><div class="rolagem"><table><tr><th>#</th><th>Mesa</th>{cab}'
-        f'<th class="c">Rodadas</th><th>Limite</th></tr>{"".join(corpo)}</table></div></div>',
+        '<p class="secao">Ranking das mesas <span>· todos os padrões · desde o início da coleta</span></p>'
+        '<p class="secao-sub">Maior sequência sem sair de cada categoria. Da melhor para a pior mesa, considerando todos os padrões juntos.</p>'
+        '<div class="card ranking"><div class="rolagem"><table>'
+        f'<tr><th rowspan="3" colspan="2" class="fixo mesa-t">Mesa</th>{cab_blocos}'
+        '<th rowspan="3" class="fixo meio">Rodadas</th><th rowspan="3" class="fixo meio sep">Limite</th></tr>'
+        f'<tr>{cab_grupos}</tr><tr>{cab_categorias}</tr>{"".join(corpo)}</table></div></div>'
+        '<div class="legenda"><span><b class="g">verde</b> = repetição mais baixa do padrão</span>'
+        '<span><b class="r">vermelho</b> = repetição mais alta do padrão</span></div>',
         unsafe_allow_html=True,
     )
