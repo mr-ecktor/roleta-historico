@@ -347,8 +347,11 @@ NOME_GRUPO = {"Vermelho / Preto": "Cor", "Par / Ímpar": "Par / Ímpar", "Baixo 
               "Dúzias": "Dúzias", "Colunas": "Colunas"}
 
 
+@st.cache_data(ttl=300, show_spinner="Calculando o ranking...")
 def ranking_geral():
-    """Recorde de cada categoria em cada mesa; ordem pela colocação média da mesa nos 5 padrões."""
+    """Recorde de cada categoria em cada mesa; ordem pela colocação média da mesa nos 5 padrões.
+    Guardado por 5 min (o intervalo da coleta): recalcular a cada clique deixava a página lenta."""
+    por_mesa, _ = dados()
     recordes, posicoes = {}, {}
     for p in PADROES:
         chaves = []
