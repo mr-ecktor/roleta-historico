@@ -179,7 +179,7 @@ st.markdown("\n".join(linha for linha in CSS.splitlines() if linha.strip()), uns
 def senha_confere(usuario, senha):
     try:
         cfg = st.secrets["login"]
-        cfg["usuario"], cfg["sal"], cfg["senha_hash"]
+        _ = (cfg["usuario"], cfg["sal"], cfg["senha_hash"])   # só confere se existem (sem atribuir, o Streamlit mostraria na tela)
     except (KeyError, FileNotFoundError):
         st.error("Login não configurado: cole o bloco [login] gerado por criar_senha.py nos Secrets do app.")
         st.stop()
