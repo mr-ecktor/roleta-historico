@@ -291,6 +291,10 @@ partes = [
     f"<span><b>{len(giros):,}</b> rodadas analisadas</span>".replace(",", "."),
     f"<span>De <b>{primeiro:%d/%m %H:%M}</b> até <b>{ultimo:%d/%m %H:%M}</b> (Brasília)</span>",
 ]
+sem_giros = datetime.now(timezone.utc) - giros[-1][0]
+if sem_giros > timedelta(minutes=30):
+    partes.append(f'<span class="alerta">⚠ Mesa sem giros novos desde {ultimo:%d/%m às %H:%M}: a fonte de dados dela '
+                  'está parada. A análise abaixo vai só até essa data.</span>')
 if len(tamanhos) > 1:
     partes.append(f'<span class="alerta">⚠ {len(tamanhos) - 1} interrupção(ões) no histórico (pausa da mesa ou giro não registrado) — a contagem recomeça após cada uma</span>')
 descartes = [f"{nome}: {k} rodadas" for nome, r in resultado.items() for k in sorted(r["descartadas"])]

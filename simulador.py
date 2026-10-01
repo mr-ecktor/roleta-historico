@@ -293,6 +293,8 @@ class SimulacaoAoVivo:
             return "aguardando sair para começar a contar"
         if robo.aguardar_saida:
             return "estourou — aguardando sair de novo"
+        if robo.sem_sair > robo.gatilho:
+            return f"{robo.sem_sair} sem sair — já passou do gatilho; aguardando sair para recomeçar"
         return f"{robo.sem_sair} sem sair — faltam {robo.gatilho - robo.sem_sair} para entrar"
 
     @property

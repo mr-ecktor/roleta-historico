@@ -49,6 +49,23 @@ MESAS_PRAGMATIC = {
     "205": "Speed Roulette 2 (Pragmatic)",
 }
 
+# Fonte reserva (CasinoScores) para mesas do TipMiner, usada quando o TipMiner para de atualizar.
+# Perde alguns giros (a análise corta a contagem nesses pontos), mas mantém a mesa viva.
+RESERVA_CASINOSCORES = {"Immersive Roulette (Evolution)": "immersiveroulette"}
+FONTE_PARADA = timedelta(minutes=15)  # último giro mais antigo que isso = fonte parada
+
+
+def _ultimo_giro(rodadas):
+    if not rodadas:
+        return None
+    return max(datetime.fromisoformat(r["finalizado_utc"].replace("Z", "+00:00")) for r in rodadas)
+
+
+def _parada(rodadas):
+    ultimo = _ultimo_giro(rodadas)
+    return ultimo is None or datetime.now(timezone.utc) - ultimo > FONTE_PARADA
+
+
 MESAS_ATIVAS = list(MESAS_EVOLUTION.values()) + list(MESAS_TIPMINER.values()) + list(MESAS_PRAGMATIC.values())
 
 URL_EVOLUTION = (
@@ -179,6 +196,8 @@ def buscar_ao_vivo(nome):
         for pid, n in MESAS_TIPMINER.items():
             if n == nome:
                 rodadas = coletar_tipminer(pid, nome, tamanho=40)
+                if _parada(rodadas) and nome in RESERVA_CASINOSCORES:
+                    rodadas = coletar_evolution(RESERVA_CASINOSCORES[nome], nome, tamanho=40)
                 break
         else:
             rodadas = coletar_pragmatic()[0].get(nome, [])
@@ -255,6 +274,13 @@ def main():
         except Exception as erro:
             problemas.append(f"{nome}: erro ao consultar o TipMiner ({erro})")
             com_erro.add(nome)
+        if nome in RESERVA_CASINOSCORES and _parada(por_mesa.get(nome)):
+            try:
+                por_mesa[nome] = coletar_evolution(RESERVA_CASINOSCORES[nome], nome)
+                com_erro.discard(nome)
+                print(f"{nome}: TipMiner parado — usando a fonte reserva (CasinoScores)")
+            except Exception as erro:
+                problemas.append(f"{nome}: fonte reserva também falhou ({erro})")
         time.sleep(1)
 
     try:

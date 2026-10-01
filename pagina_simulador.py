@@ -7,7 +7,7 @@ e simula as apostas com a tabela de recuperação do usuário, em um ou mais pad
 O estado fica na sessão do navegador: fechar a aba encerra a simulação.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import escape
 
 import streamlit as st
@@ -19,6 +19,7 @@ from simulador import CATEGORIAS, PAGAMENTO, SimulacaoAoVivo, niveis_tabela, seq
 ATUALIZAR_A_CADA_S = 10
 NOME_GRUPO = {1: "Cor, Par/Ímpar e Alto/Baixo", 2: "Dúzias e Colunas"}
 MAX_RECUPERACOES = {1: 15, 2: 22}  # limites da tabela de recuperação do usuário
+FONTE_PARADA = timedelta(minutes=5)  # último giro mais antigo que isso = a fonte da mesa parou
 
 
 def reais(v, sinal=False):
@@ -232,6 +233,13 @@ def pagina_simulador(por_mesa, limites):
                 anteriores = giros_recentes(mesa)
             except Exception as erro:
                 st.error(f"Não foi possível ler a mesa agora ({erro}). Tente de novo em alguns segundos.")
+                return
+            # Fonte parada: o último giro é antigo. Simular em cima disso só mostraria dados velhos.
+            parada = (datetime.now(timezone.utc) - anteriores[-1][0]) if anteriores else None
+            if parada is None or parada > FONTE_PARADA:
+                desde = f"desde {anteriores[-1][0].astimezone(FUSO_BRASILIA):%d/%m às %H:%M}" if anteriores else ""
+                st.error(f"A fonte de dados desta mesa está parada {desde}. O simulador ao vivo não tem como "
+                         "acompanhar os giros dela agora — escolha outra mesa.")
                 return
             sim = SimulacaoAoVivo(categorias, gatilhos, fichas_por_padrao, banca, limite_max=maximos)
             sim.aquecer([(t, n) for t, n, _ in anteriores])
